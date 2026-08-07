@@ -6,7 +6,20 @@ const { spawnSync } = require('child_process');
 const repoRoot = path.resolve(__dirname, '..');
 const DOC_PATHS = new Set(['docs/USER_GUIDE.md', 'docs/TECHNICAL.md', 'docs/ADMIN.md']);
 const RELEVANT_FILES = new Set(['server.js', 'package.json', 'package-lock.json']);
-const RELEVANT_PREFIXES = ['public/', 'server/'];
+const RELEVANT_PREFIXES = ['public/', 'server/', 'scripts/'];
+
+function checkHtmlSync() {
+  const result = spawnSync(process.execPath, [path.join(__dirname, 'generate-docs.js'), '--check'], {
+    cwd: repoRoot,
+    stdio: 'inherit',
+  });
+  return result.status === 0;
+}
+
+function pass(message) {
+  print(message);
+  process.exit(checkHtmlSync() ? 0 : 1);
+}
 
 function normalizePath(filePath) {
   return String(filePath || '').replace(/\\/g, '/').replace(/^\.\//, '');
@@ -66,15 +79,13 @@ function print(message) {
 }
 
 if (process.env.DOCS_GUARD_BYPASS === '1') {
-  print('[docs-guard] Bypassed by DOCS_GUARD_BYPASS=1');
-  process.exit(0);
+  pass('[docs-guard] Relevance check bypassed by DOCS_GUARD_BYPASS=1');
 }
 
 const changed = collectChangedFiles();
 
 if (changed.source === 'nogit') {
-  print('[docs-guard] No .git directory detected. Pass changed paths explicitly or run inside a git checkout.');
-  process.exit(0);
+  pass('[docs-guard] No .git directory detected. Pass changed paths explicitly or run inside a git checkout.');
 }
 
 if (changed.source === 'git-error') {
@@ -83,20 +94,17 @@ if (changed.source === 'git-error') {
 }
 
 if (!changed.files.length) {
-  print('[docs-guard] No staged or supplied files to inspect.');
-  process.exit(0);
+  pass('[docs-guard] No staged or supplied files to inspect.');
 }
 
 const relevantChanges = changed.files.filter(isRelevantChange);
 if (!relevantChanges.length) {
-  print('[docs-guard] No documentation-relevant app changes detected.');
-  process.exit(0);
+  pass('[docs-guard] No documentation-relevant app changes detected.');
 }
 
 const touchedDocs = changed.files.filter(filePath => DOC_PATHS.has(filePath));
 if (touchedDocs.length) {
-  print('[docs-guard] Relevant code changed and docs were updated in the same change.');
-  process.exit(0);
+  pass('[docs-guard] Relevant code changed and docs were updated in the same change.');
 }
 
 print('[docs-guard] Relevant app files changed, but no tracked Markdown docs were updated.');

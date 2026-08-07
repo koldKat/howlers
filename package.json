@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "description": "Family howlers journal with user accounts and SQLite storage",
   "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js",
     "test": "node scripts/regression-test.js",
+    "docs:build": "node scripts/generate-docs.js",
+    "docs:html-check": "node scripts/generate-docs.js --check",
     "docs:check": "node scripts/docs-guard.js",
     "hooks:install": "node scripts/install-hooks.js",
     "prepare": "node scripts/install-hooks.js"

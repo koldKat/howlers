@@ -1,432 +1,311 @@
 # Howlers Webapp Technical Documentation
 
-## Overview
-Howlers Webapp is a small Node.js + vanilla JS application with a static client and a minimal HTTP server.
+## Purpose and stack
 
-Repository/runtime note:
-- the repository is still named `Howlers Webapp`, but the shipped Bulgarian UI brand shown to end users is **Семейни бисери**
+Howlers Webapp is the repository name. The Bulgarian product name shown in the UI is **Семейни бисери**.
 
-Core stack:
-- Node.js built-in `http`, `fs`, and `path`
-- `better-sqlite3` for persistence
-- server-sent events for live client refreshes
-- no frontend framework
+The application is intentionally small and self-contained:
 
-## Project Layout
-- `server.js`: HTTP server composition, top-level route matching, and app route handlers
-- `server/auth.js`: shared authenticated-session guard
-- `server/config.js`: paths, port, request limits, backup policy, MIME map, and protected admin usernames
-- `server/db.js`: SQLite schema, auth/session helpers, entry queries, summary queries
-- `server/http.js`: JSON response helper, request body parsing, token extraction, and localhost detection
-- `server/static.js`: static file serving from `public/`
-- `server/public.js`: server-rendered public post pages, dynamic sitemap, and robots output
-- `server/sse.js`: server-sent events client registry and publish helpers
-- `server/state.js`: authenticated and guest app-state builders
-- `server/image-validation.js`: shared raster data URL, decoded-size, and file-signature validation
-- `server/howler-validation.js`: entry payload validation and default local date helper
-- `server/export.js`: TXT export and print/PDF HTML rendering
-- `server/backup.js`: hourly SQLite snapshot ZIP creation and 14-day retention
-- `server/routes/admin.js`: localhost-only admin page and admin API handlers
-- `scripts/regression-test.js`: isolated end-to-end API regression suite using a temporary SQLite database
-- `public/index.html`: app structure and themed confirm dialog markup
-- `public/css/style.css`: full visual styling, including custom favorite control and confirm modal
-- `public/js/app.js`: main client entry point and feature orchestration for auth, profile, editor, feed rendering, SSE, and event binding
-- `public/js/app/api.js`: main-app token helpers and JSON API wrapper
-- `public/js/app/constants.js`: main-app slugs, formatting metadata, emoticon tokens, and upload limits
-- `public/js/app/dom.js`: main-app DOM lookup and shared backdrop-dismiss behavior
-- `public/js/app/format.js`: main-app HTML escaping, date formatting, and data URL size helpers
-- `public/js/i18n.js`: lightweight i18n module - locale loading, `t()` translation helper, and DOM text application
-- `public/locales/bg.json`: Bulgarian translation strings
-- `public/admin.html`: localhost-only admin panel (not served to external users)
-- `public/css/admin.css`: standalone admin panel styles
-- `public/js/admin.js`: admin panel entry point and feature orchestration for stats, entries, users, maintenance actions, auto-refresh, and event binding
-- `public/js/admin/core.js`: admin formatting helpers, escaping, table cell helpers, and JSON API wrapper
-- `public/js/admin/dialogs.js`: admin toast and confirm dialog wiring
-- `scripts/docs-guard.js`: checks whether docs were updated when relevant app files changed
-- `scripts/install-hooks.js`: installs the repo pre-commit hook when a `.git` directory exists
-- `.githooks/pre-commit`: runs the docs guard before commit
-- `docs/USER_GUIDE.md`: end-user documentation
-- `docs/USER_GUIDE.html`: HTML version of the end-user documentation
-- `docs/ADMIN.md`: admin panel documentation
-- `docs/ADMIN.html`: HTML version of the admin panel documentation
-- `docs/TECHNICAL.md`: this file
-- `docs/TECHNICAL.html`: HTML version of this technical reference
+- Node.js built-in HTTP server
+- SQLite through `better-sqlite3`
+- vanilla JavaScript ES modules in the browser
+- server-sent events for live updates
+- no frontend framework or build step
+- Bulgarian UI strings loaded through a lightweight i18n module
 
-## Runtime
-Default port:
-- `3019`
+## Requirements and startup
 
-Startup:
+Runtime requirements:
+
+- Node.js 18 or newer
+- npm
+- `zip` available on `PATH` for automatic database archives
+
+Install and run:
 
 ```bash
+npm install
 npm start
 ```
 
-The app serves static files from `public/`.
-Set `PORT` to override the default listener.
+The default address is `http://localhost:3019`.
 
-Automatic backups:
-- the server creates a ZIP backup of the SQLite database at each clock-hour boundary; restarting the server does not create an extra backup
-- retention is 14 days
-- each backup is created as a temporary SQLite snapshot and then compressed to a `.zip` archive
-- every backup run logs the retention check result, including when `0` expired backups were removed
-- a snapshot or ZIP failure is logged without crashing the server; the next clock-hour attempt remains scheduled
+Environment variables:
 
-Regression checks run with `npm test`. The suite sets `DATABASE_PATH` to a temporary SQLite file and `DISABLE_BACKUPS=1`, so it does not touch normal data or create backups.
+- `PORT`: listener port, default `3019`
+- `DATABASE_PATH`: absolute path or a path resolved from the process working directory, default `database.sqlite` in the repository root
+- `DISABLE_BACKUPS=1`: disables backup scheduling
 
-JSON request bodies are capped at 2 MiB. Oversized bodies return `413`, and malformed percent-encoded paths return `400`, rather than being reported as internal server errors.
+The server binds through `server.listen(PORT)` and is therefore reachable on the interfaces selected by Node.js for the host. The admin routes still enforce a localhost remote address.
 
-## Data Model
+## Repository layout
+
+Server composition:
+
+- `server.js`: listener, top-level route table, and application handlers
+- `server/config.js`: paths, limits, backup policy, MIME types, and protected usernames
+- `server/http.js`: JSON responses, bounded request parsing, token extraction, and localhost detection
+- `server/auth.js`: authenticated session guard
+- `server/db.js`: schema setup, migrations, queries, transactions, and backup snapshot creation
+- `server/state.js`: authenticated and guest state builders
+- `server/sse.js`: live client registry and state publishing
+- `server/static.js`: static files under `public/`
+- `server/public.js`: public post HTML, sitemap, and robots output
+- `server/export.js`: TXT and print/PDF export rendering
+- `server/image-validation.js`: raster data URL size and signature checks
+- `server/howler-validation.js`: entry normalization and validation
+- `server/backup.js`: hourly ZIP creation and 14-day retention
+- `server/routes/admin.js`: localhost-only admin handlers
+
+Browser code:
+
+- `public/index.html`: main app and modal structure
+- `public/js/app.js`: UI orchestration, rendering, editor, profile, uploads, and SSE lifecycle
+- `public/js/app/api.js`: token storage and JSON API wrapper
+- `public/js/app/constants.js`: categories, moods, emoticons, formatting, and client upload limits
+- `public/js/app/dom.js`: DOM references and backdrop dismissal
+- `public/js/app/format.js`: escaping, dates, and data URL sizing
+- `public/js/i18n.js`: locale loading and DOM translation
+- `public/locales/bg.json`: Bulgarian strings
+- `public/admin.html`, `public/js/admin.js`, `public/js/admin/*`, `public/css/admin.css`: admin panel
+
+Documentation and verification:
+
+- `scripts/regression-test.js`: isolated HTTP regression suite
+- `scripts/docs-guard.js`: staged-change documentation guard
+- `scripts/generate-docs.js`: Markdown to HTML documentation generator and sync checker
+- `.githooks/pre-commit`: repository pre-commit hook
+- `docs/*.md`: documentation sources
+- `docs/*.html`: generated standalone equivalents
+
+## Request flow
+
+The top-level server parses the URL, matches explicit API and SEO routes, and falls back to static GET handling. JSON request bodies are limited to 2 MiB. Oversized requests return `413`; malformed encoded paths return `400`.
+
+API responses use JSON unless the route explicitly returns HTML, XML, plain text, an export, or an SSE stream. Unmatched non-GET routes return `404`.
+
+Static serving resolves paths below `public/` and rejects traversal outside that root.
+
+## Database and migrations
+
+The database enables WAL mode and foreign keys at startup. Schema creation is idempotent. Older databases are upgraded with `addColumnIfMissing()` calls and a family bootstrap transaction.
+
 ### `users`
-- `id`
-- `username` unique
-- `password_hash`
-- `salt`
-- `locale` (default `'bg'`) - current UI language setting; only Bulgarian is supported right now
-- `display_name` - optional human-readable name shown in nav and profile (login username is unchanged)
-- `avatar` - optional JPEG, PNG, WebP, or GIF profile picture stored as a base64 data URL (max 300 KiB decoded)
-- `created_at`
 
-### `families`
-- `id`
-- `created_at`
+- `id`, `username`, `password_hash`, `salt`, `created_at`
+- `locale`, currently normalized to `bg`
+- optional `display_name`
+- optional `avatar` data URL
 
-### `family_members`
-- `family_id`
-- `user_id` - one row per user; each user belongs to exactly one family archive
-- `created_at`
+Avatars must be JPEG, PNG, WebP, or GIF and decode to no more than 300 KiB.
+
+### `families` and `family_members`
+
+Each user belongs to exactly one family through a unique `family_members.user_id`. A new user receives a new family. Entries and children are scoped by `family_id` so every family member sees the shared archive.
 
 ### `family_invites`
-- `id`
-- `family_id` - the family archive the invite points into
-- `inviter_user_id`
-- `invitee_user_id`
-- `status` - `pending`, `accepted`, or `cancelled`
-- `created_at`
-- `responded_at`
+
+Invites record the target family, inviter, invitee, status, creation time, and response time. Status is `pending`, `accepted`, or `cancelled`.
+
+Accepting an invite runs in a transaction. It moves the invitee family's entries, children, members, and relevant pending invites into the inviter family, then removes the old family row. This is a merge, not a reversible membership toggle.
 
 ### `sessions`
-- `token`
+
+- bearer `token`
 - `user_id`
 - `created_at`
+- `last_active_at`
 
-### `howlers`
-- `id`
-- `user_id`
-- `family_id` - shared archive scope; all fellow parents see these entries
-- `child_name`
-- `title`
-- `quote` - legacy storage column, retained for backward compatibility
-- `story` - stores the current combined entry content
-- `photo` - optional JPEG, PNG, WebP, or GIF data URL; decoded image payload is limited to 512 KiB
-- `category`
-- `happened_on`
-- `age_note`
-- `mood`
-- `tags_json`
-- `is_favorite`
-- `is_public` - when `1`, entry appears in the public feed at `/api/feed`
-- `created_at`
-- `updated_at`
-
-API entry objects also include derived `content`, formed by joining non-empty `quote` and `story` values with one blank line. This preserves both parts of records created before the editor fields were merged.
+`getSession()` updates `last_active_at`. At server startup, sessions inactive for more than seven days are purged. Session deletion is also used by logout and admin session clearing.
 
 ### `kids`
-- `id`
-- `user_id`
-- `family_id` - shared archive scope
-- `name` - display name or nickname (max 60 chars)
-- `dob` - date of birth in `YYYY-MM-DD` format, or empty string
-- `created_at`
 
-## Auth Model
-Authentication is token-based.
+Children have an owner `user_id`, shared `family_id`, name, optional `dob`, and creation time. Removing a child from the family list does not alter existing entry text.
 
-Flow:
-1. user registers or logs in
-2. server creates a session token
-3. client stores it in `localStorage` under `howlers_webapp_token`
-4. client sends it as `Authorization: Bearer <token>`
-5. SSE uses `?token=` query parameter
+### `howlers`
 
-Passwords are hashed with `crypto.scrypt` plus per-user salts.
+Important columns:
 
-Each account belongs to exactly one family archive through `family_members`. New users start in their own family. Accepting a fellow-parent invite merges the invitee's existing family archive into the inviter's archive so existing kids and howlers are preserved.
+- owner `user_id` and shared `family_id`
+- `child_name`, `title`, `happened_on`, and `age_note`
+- legacy `quote` plus current `story`
+- `photo`, `category`, `mood`, and `tags_json`
+- `is_favorite` and `is_public`
+- `created_at` and `updated_at`
 
-## API
-### Auth
-- `POST /api/register`
-- `POST /api/login`
-- `POST /api/logout`
-- `GET /api/me` - returns `{ username, displayName, locale, avatar }`
-- `POST /api/locale` - body `{ locale }`; currently accepts only `'bg'`, but the endpoint is kept so adding more locales later does not require a larger API refactor
+API objects expose derived `content` by joining non-empty `quote` and `story` values with one blank line. Current clients store the combined editor content in `story`; the old columns remain readable so earlier records are not lost.
 
-### Profile
-- `GET /api/profile` - returns `{ id, username, displayName, locale, avatar, familyId, familyMembers, incomingInvites, outgoingInvites }`
-- `PATCH /api/profile` - body `{ displayName }`, updates display name; returns `{ ok, displayName, profile }`
-- `POST /api/profile/password` - body `{ currentPassword, newPassword }`, changes password (scrypt re-hash)
-- `POST /api/profile/avatar` - body `{ avatar }`, stores or clears an allowlisted raster data URL; max 300 KiB decoded; returns `{ ok, avatar }`
+Entry photos use allowlisted raster data URLs and decode to no more than 512 KiB. Images and avatars are stored inside SQLite, so they contribute directly to database and backup size.
 
-### Family Invites
-- `POST /api/family/invites` - body `{ username }`, sends a pending invite to an existing user
-- `POST /api/family/invites/:id/accept` - accepts an incoming invite and merges archives
-- `DELETE /api/family/invites/:id` - cancels an outgoing invite or declines an incoming invite
+## Authentication and authorization
 
-### Kids
-- `GET /api/kids` - returns array of `{ id, name, dob }` for the authenticated user's shared family archive
-- `POST /api/kids` - body `{ name, dob? }`, adds a kid to the shared family list; triggers SSE push; returns `{ ok, kid }`
-- `DELETE /api/kids/:id` - removes a kid from the shared family list (does not affect howler entries); triggers SSE push
+Passwords are hashed with `crypto.scrypt` and a random per-user salt. Session tokens are 32 random bytes encoded as hexadecimal.
+
+Normal API clients send `Authorization: Bearer <token>`. EventSource and browser export navigation use `?token=` because those browser APIs do not set the bearer header in this app.
+
+Authorization boundaries:
+
+- authenticated archive routes are scoped to the session user's family
+- every family member can create, edit, and delete entries in that shared archive
+- public feed and public post routes expose only entries with `is_public = 1`
+- public entry objects replace tags with an empty array
+- admin routes depend on localhost network origin, not a user role
+- `slanchoff` and `koldkat` cannot be deleted through the admin API
+
+Tokens are stored in browser `localStorage`. Deployments should use HTTPS when accessed across a network and should avoid logging URLs containing export or SSE tokens.
+
+## API routes
+
+### Authentication and profile
+
+- `POST /api/register`: `{ username, password }`, returns `{ token, username }`
+- `POST /api/login`: `{ username, password }`, returns `{ token, username }`
+- `POST /api/logout`: deletes the supplied session and closes its SSE clients
+- `GET /api/me`: returns `{ username, displayName, locale, avatar }`
+- `POST /api/locale`: authenticated compatibility endpoint that normalizes the account locale to `bg`
+- `GET /api/profile`: profile, family members, and pending invites
+- `PATCH /api/profile`: updates `displayName` and returns the refreshed profile
+- `POST /api/profile/password`: changes a password after verifying the current password
+- `POST /api/profile/avatar`: stores or clears an avatar data URL
+
+### State and public content
+
+- `GET /api/state`: full authenticated application state
+- `GET /api/events`: guest or authenticated SSE stream
+- `GET /api/feed`: public entries without private tags
+- `GET /posts/:id`: server-rendered public entry or `404` for a private/missing entry
+- `GET /sitemap.xml`: root page plus up to 50,000 public entry URLs
+- `GET /robots.txt`: crawler rules and sitemap address
+
+Authenticated state contains `app`, `viewer`, `profile`, `attention`, `summary`, `entries`, `kids`, and `publicFeed`. Guest SSE state contains `app` and `publicFeed`.
+
+### Entries and children
+
+- `POST /api/howlers`: creates an entry and returns `{ ok, entry, state }`
+- `PUT /api/howlers/:id`: replaces an entry and returns `{ ok, entry, state }`
+- `DELETE /api/howlers/:id`: deletes an entry and returns `{ ok, state }`
+- `GET /api/kids`: lists shared family children
+- `POST /api/kids`: creates a child and returns `{ ok, kid }`
+- `DELETE /api/kids/:id`: removes a child from the shared list
+
+Current entry input uses `content`. Legacy `quote` and `story` input remains accepted. Required values are child name, title, and non-empty text. Empty category and mood use `said` and `golden`; non-empty values must be in the fixed lists from `public/js/app/constants.js`.
+
+New entries without `happenedOn` receive the server's current local date. Updates do not add a date to an intentionally undated old entry.
+
+### Family invites
+
+- `POST /api/family/invites`: sends an invite by username
+- `POST /api/family/invites/:id/accept`: accepts an incoming invite and merges families
+- `DELETE /api/family/invites/:id`: declines an incoming invite or cancels an outgoing invite
+
+### Export
+
+- `GET /api/export?format=txt`: downloads UTF-8 plain text
+- `GET /api/export?format=pdf`: returns print-oriented HTML and opens the browser print dialog
+
+The PDF route does not generate a PDF file on the server. The user selects PDF in the browser print dialog.
 
 ### Admin
-- `GET /admin` - localhost only; serves the admin panel HTML (403 from any other origin)
-- `GET /api/admin/stats` - localhost only; returns system stats + category/mood breakdowns + memory
-- `GET /api/admin/users` - localhost only; returns array of user rows with entry/session counts and `isProtected` for protected admin accounts
-- `GET /api/admin/entries` - localhost only; returns all entries with user info (most recent first, limit 200)
-- `PATCH /api/admin/entries/:id` - toggle `is_public` on an entry; returns `{ isPublic }`, or 404 if the entry does not exist
-- `DELETE /api/admin/entries/:id` - permanently delete a single entry, or return 404 if it does not exist
-- `DELETE /api/admin/users/:id` - delete user and all their data (entries, kids, sessions), close that user's live SSE streams, and return 403 for protected admin users `slanchoff` and `koldkat`
-- `DELETE /api/admin/users/:id/sessions` - clear all sessions for a user, send a `sessionExpired` SSE message to active tabs, and close those streams
-- `POST /api/admin/vacuum` - run `VACUUM` + WAL checkpoint to compact the database
 
-### App State
-- `GET /api/state`
-- `GET /api/events`
-- `GET /api/feed` - unauthenticated; returns all public howlers sorted newest first
-- `GET /posts/:id` - server-rendered public landing page for a public entry; private/non-public entries return 404 with `noindex`
-- `GET /sitemap.xml` - dynamic sitemap containing `/` and public entry pages only
-- `GET /robots.txt` - allows public pages, disallows `/admin` and `/api/`, and points crawlers to the dynamic sitemap
+All admin routes require localhost:
 
-### Entries
-- `POST /api/howlers` - accepts the entry fields plus optional `photo` data URL; returns the created entry and refreshed app `state`
-- `PUT /api/howlers/:id` - replaces entry fields; send `photo: ""` to remove the existing photo; returns the updated entry and refreshed app `state`
-- `DELETE /api/howlers/:id` - returns refreshed app `state` without the deleted entry
+- `GET /admin`
+- `GET /api/admin/stats`
+- `GET /api/admin/users`
+- `GET /api/admin/entries`
+- `PATCH /api/admin/entries/:id`
+- `DELETE /api/admin/entries/:id`
+- `DELETE /api/admin/users/:id`
+- `DELETE /api/admin/users/:id/sessions`
+- `POST /api/admin/vacuum`
 
-All authenticated entry routes are family-scoped. A fellow parent can create, edit, or delete any entry in the shared family archive.
-For current clients, `content` is the combined post text and `photo` is optional. Photo data must use an allowlisted raster data URL and decode to no more than 512 KiB.
-When a new entry omits `happenedOn`, the server assigns its current local calendar date. Updates do not apply this default, so editing an intentionally undated legacy entry does not silently change its date.
+Admin entry mutation returns `404` when the entry does not exist. Protected-user deletion returns `403`.
 
-## State Shape Returned By `/api/state`
-Top-level keys:
-- `app`
-- `viewer`
-- `profile`
-- `attention`
-- `summary`
-- `entries`
-- `kids`
-- `publicFeed`
+## Entry validation
 
-`viewer` includes:
-- `id`
-- `username`
-- `displayName`
-- `locale`
-- `avatar`
-- `familyId`
+Server validation enforces:
 
-`summary` includes:
-- total count
-- favorite count
-- number of kids represented
-- category breakdown
-- kid breakdown
-- recent items
-- first and last timestamps
+- child name up to 60 characters
+- title up to 120 characters
+- current combined content up to 5,000 characters
+- legacy quote up to 800 and story up to 4,000 characters
+- a real calendar date in `YYYY-MM-DD` form when present
+- fixed category and mood values
+- raster image MIME, decoded size, and matching file signature
 
-`attention` includes:
-- `pendingInviteCount`
-- `pendingInviteSenders` (up to two inviter identities for UI copy)
+Tags are normalized by trimming, removing empty values and duplicates, and keeping at most eight.
 
-DB size is only available through the admin panel (`/api/admin/stats`), not in user-facing state.
+## Live update model
 
-## UI Notes
-### Layout
-The app uses a persistent layout visible to all visitors:
+The browser hydrates over HTTP and then opens `/api/events`.
 
-The spacing scale is intentionally compact: panels, feed cards, form grids, and especially modal shells use reduced padding and gaps to keep more content visible while retaining practical button and input targets.
+- authenticated clients receive full family state
+- guest clients receive the current public feed
+- entry mutations publish to all clients because they may affect public content
+- profile, child, and invite changes publish to affected family users
+- the mutating tab also renders the refreshed state from create, update, and delete responses
+- invalidated sessions receive `{ sessionExpired: true }` before the stream closes
+- failed streams are removed so they cannot make later mutations fail
+- EventSource reconnects after transient network loss
 
-- **Sticky nav bar** at the top: app name plus equal-height themed pill controls (Sign In for guests, or `New Entry`, username chip, and a distinct coral logout button for logged-in users).
-- Header copy avoids repeating the family/archive concept across eyebrow, title, and subtitle: eyebrow is `Личен дневник`, title remains the brand, and subtitle is `Реплики, случки и малки легенди`.
-- **Admin panel** uses Bulgarian UI copy. Its nav bar mirrors the main app header structure, warm gradient, three-line brand treatment, dimensions, shadows, pill controls, and compact mobile behavior while retaining admin status badges and maintenance actions.
-- **Feed column** (left, always visible): scrollable list of entries. For guests this shows public entries only. For logged-in users this shows the shared family archive with a simplified search-only toolbar above; if the family archive has no entries yet, it falls back to the public feed until the family creates one.
-- **Sidebar** (right): guests see compact promo cards explaining the private archive, optional public posts, photos, search, parent invites, archive export, and the login/register path. Logged-in users instead see Family Snapshot stats (3 full-width stacked stat cards - total, favorites, kids - each with label on left and big number on right, color-coded with left accent border; plus category/kids chips) and the children panel. Sidebars stick below the nav bar at wide screens and stack below the feed on narrow screens.
-- Tooltips use app-themed `data-tooltip` styling in the main and admin UI. Native `title` attributes are avoided for interactive controls and truncated admin text so browser-default tooltip styling does not leak into the interface.
-- Bulgarian count copy selects singular and plural forms independently for entries/stories and children, avoiding slash forms such as `дете/деца`.
-- entry metadata is assembled from non-empty child, date, and age-note values, so undated entries do not render placeholder dates or stray separators
+There is no custom SSE heartbeat. Reverse proxies should allow long-lived event-stream responses and disable buffering for `/api/events`.
 
-There is no separate login page. The Sign In / Register form appears as a centred modal overlay, triggered by the "Sign In" nav button. A top-right `×`, Escape, or an intentional stationary click on the backdrop dismisses it.
+## Backups and recovery
 
-### Public Feed
-Guests land on the feed immediately without a separate landing screen. Any entry marked as **Public** appears there.
-For logged-out users, `setAuthState(false)` hides the authenticated sidebar and shows the guest promo sidebar next to the feed on wide screens.
-Tags are private archive metadata: `listPublicHowlers()` replaces them with an empty array, and public cards do not render a tag container. Authenticated family state retains the original tags for search and editing.
-Public feed titles link to `/posts/:id`, which is also the URL listed in the sitemap. Public post pages include canonical, description, Open Graph, Twitter summary, and JSON-LD metadata generated from public entry content.
+At startup the scheduler waits until the next clock-hour boundary. It then runs every hour.
 
-### Dashboard (removed)
-The old 12-column grid dashboard (launcher panel, recent activity, summary, spotlight, archive, favorites panels) has been replaced by the feed+sidebar layout described above.
+Each run:
 
-### Editor Dialog
-The howler form now lives inside a modal dialog instead of a persistent dashboard panel.
+1. creates a consistent temporary SQLite snapshot with `VACUUM INTO`
+2. compresses it as `backups/database-YYYY-MM-DD_HH-00-00.zip`
+3. removes the temporary snapshot
+4. deletes `.zip` and `.sqlite` backup files older than 14 days
+5. logs creation and retention results
 
-Behavior:
-- the `New Entry` launcher opens a blank form dialog
-- the default view is intentionally simplified for casual users: only the core fields are shown first
-- the former quote and story inputs are presented as one `content` field; API responses derive it by joining non-empty legacy `quote` and `story` values with a blank line
-- the database columns remain for backward compatibility; current `content` writes store the complete combined text in `story` and clear `quote`, preserving all visible text when an old entry is edited
-- the editor accepts one post photo, previews it locally, retains it during edits, and allows explicit replacement or removal
-- browser-side processing converts uploads to JPEG, limits the longest edge to 1600 px, and reduces quality/dimensions until the decoded payload is at most 512 KiB
-- the server independently allowlists JPEG/PNG/WebP/GIF data URLs, validates their binary signatures, and rejects decoded payloads above 512 KiB
-- custom SVG emoticon palettes below the title and combined content field provide 12 hand-drawn expressions and insert any number at the current text caret; they do not use Unicode emoji or platform-default artwork
-- inline faces are stored in the existing text fields as allowlisted tokens such as `:laugh:` and rendered as SVG only after all ordinary text is HTML-escaped
-- rendered SVG markup is emitted without surrounding whitespace so fields using `white-space: pre-wrap` do not introduce line breaks around emotes
-- compact formatting toolbars support bold, italic, underline, and strikethrough in the title and combined content field using `[b]`, `[i]`, `[u]`, and `[s]` markers
-- the editor remembers the latest title/content selection, so toolbar clicks wrap the selected text in the correct field even after the button receives pointer input
-- the same formatting actions are available from `Ctrl/Cmd+B`, `Ctrl/Cmd+I`, `Ctrl/Cmd+U`, and `Ctrl/Cmd+Shift+X`, operating on the current selection or caret in new and edit dialogs
-- formatting markers are stored as plain text, converted only to fixed allowlisted HTML elements after escaping, retained verbatim in TXT export, and rendered in the printable HTML export
-- optional metadata such as date, category, mood, tags, favorite/public flags, and age note live behind an explicit advanced-options toggle
-- the advanced section uses the actual `hidden` attribute now, so it stays collapsed until explicitly opened
-- child selection is now a themed in-app select instead of an unstyleable browser datalist
-- choosing an existing child with a saved birth date auto-fills the entry age note based on the selected entry date (or today when no date is set)
-- clicking `Edit` on any entry opens the same dialog in edit mode
-- save and delete actions close the dialog after a successful request
-- the editor and profile use a consistent circular `×` control in the top-right
-- pressing `Escape` or intentionally clicking the backdrop closes a dialog
-- backdrop dismissal requires the pointer press and release to both occur on the backdrop with negligible movement, so dragging a text selection outside the dialog does not close it
-- the main app and admin backgrounds keep both the color bands and SVG drawing layers fixed while content scrolls
+If snapshot creation or `zip` fails, the error is logged and later hourly attempts remain scheduled. A server restart does not create an immediate backup.
 
-### Favorite + Public Controls
-Both the favorite and public toggles are styled as checkbox cards (see **Favorite Control** below).
+Recovery is manual. Stop the server, preserve the current database files, extract a selected archive, place the recovered SQLite file at `DATABASE_PATH`, and then restart. Test recovery on a copy before replacing production data.
 
-- **Favorite**: includes the entry in the family favorite count and marks it as a favorite in the archive.
-- **Public**: makes the entry visible to anyone in the public feed at `/api/feed`.
+## Public pages and SEO
 
-The public/favorite state is edited in the form, but not repeated as extra chips on the feed cards.
+Public entry pages include canonical metadata, Open Graph fields, JSON-LD article data, and the shared app styling. Private or missing IDs return a small `noindex` 404 page.
 
-### Profile + Family Archive
-The profile modal now has a **Family Archive** section.
-- profile identity saves return the complete refreshed profile; the client renders from its merged profile object so partial SSE or mutation payloads cannot blank fields such as `displayName`
+The base URL is built from `X-Forwarded-Proto`, `X-Forwarded-Host`, or `Host`. A reverse proxy must provide trustworthy values so canonical and sitemap URLs are correct.
 
-Behavior:
-- shows every current family member
-- lets the user send a username-based invite to another existing account
-- pins incoming invites to a highlighted attention section at the very top of the profile modal, with **Accept** / **Decline**
-- lists outgoing invites with **Cancel invite**
-- surfaces pending incoming invites outside the profile modal too, via a highlighted archive notice and a count badge on the nav profile button
-- accepting an invite merges both archives into one shared family archive
+## Frontend behavior
 
-The avatar uploader in the profile modal uses a small circular `+` badge anchored to the avatar preview. Hover/focus reveals a themed tooltip; the old full-overlay avatar text is no longer shown.
+The main client keeps token and UI state in module scope, renders escaped user text, and converts the supported lightweight formatting markers and emoticon tokens to safe HTML.
 
-### Favorite Control
-The favorite toggle is intentionally not browser-native in appearance.
-It is implemented as:
-- a real checkbox for semantics
-- visually restyled into a themed card control
-- custom checked indicator via CSS
+Modal dismissal accepts Escape, the close button, or an intentional click on the backdrop. Pointer dragging that starts inside a dialog does not dismiss it when released outside.
 
-### Confirmation Dialog
-Deletion uses a custom modal instead of `window.confirm()`.
+The CSS uses three responsive ranges:
 
-Implementation:
-- HTML overlay and dialog in `public/index.html`
-- modal styles in `public/css/style.css`
-- promise-based confirm helper in `public/js/app.js`
+- up to 860 px: the layout becomes one column
+- up to 600 px: controls stack and editor/profile dialogs become bottom sheets
+- up to 400 px: compact actions stack where necessary
 
-### Theme
-The current UI theme is intentionally colorful and playroom-inspired:
-- the page background uses the shared full-viewport `public/background-scene.svg` illustration over three CSS color bands, with small doodles distributed toward both sides so wide displays do not leave the edges empty
-- doodles follow the meaning of each band: the blue sky contains the sun, clouds, and several simple flying-bird marks made from uneven paired arcs; the yellow sand contains an unmistakable sandcastle, pail, shovel, and beach ball; the green grass contains a child-drawn house with a diagonally tilted chimney visibly attached to the roof, a tree, flowers, grass tufts, one running stick figure, and another waving while holding a balloon
-- the SVG is built from simple one-stroke constructions with uneven outlines, doubled crayon-like marks, mismatched details, imperfect symmetry, and inconsistent proportions; repeated objects are drawn separately rather than cloned so the scene resembles a child's drawing rather than polished icon art
-- a low-contrast CSS texture layer sits fixed over the page so the background keeps some depth without continuous animation cost
-- the sticky header is translucent on purpose so the top of the doodle scene can visually continue through it instead of being cut off
-- panel sections use distinct color families so the dashboard feels more playful and thematic
-- preserved layout, spacing, and component structure so this remains a styling-only change
-
-## Live Update Model
-The client hydrates once, then opens `/api/events`.
-
-Live update behavior:
-- authenticated sessions receive the full app state over SSE, including viewer/profile data, family archive state, kids, attention data, and the current public feed
-- failed or already-closed SSE responses are removed from the registry so they cannot make an unrelated mutation return a server error
-- guest sessions can also subscribe to `/api/events`; they receive public-feed updates without logging in
-- authenticated SSE clients keep their session token attached server-side; if the token is deleted by logout, admin session clearing, or user deletion, the server sends `{ sessionExpired: true }` and closes the stream
-- the client handles `sessionExpired` by clearing the local token, closing private dialogs, rendering the public feed, reopening guest SSE, and showing the login dialog
-- profile modal content can now update live because the SSE payload includes `profile`
-- entry create/update/delete and admin public-entry changes fan out through SSE so both the public feed and authenticated public-feed fallback stay current
-- the mutating tab renders the refreshed `state` returned by create/update/delete immediately; SSE remains the cross-tab and cross-user synchronization mechanism rather than the only local refresh path
-- transient SSE connection drops are allowed to reconnect quietly; the client no longer turns every short interruption into a visible disconnect warning
-- family/profile/kid/invite changes still publish only to affected authenticated users
-
-CPU-oriented guardrails:
-- avoid animating full-screen fixed background layers unless there is a strong reason
-- avoid scroll-time blur effects on persistent surfaces like the sticky header
-- debounce user-driven re-renders such as live search instead of repainting on every keystroke
-
-## Validation Rules
-Server-side validation requires:
-- `childName`
-- `title`
-- non-empty `content` for the current client, while legacy `quote`/`story` API payloads remain accepted
-- a real calendar date in `YYYY-MM-DD` form if date is present
-- bounded lengths for child name, title, and combined content; legacy quote/story payloads retain their previous limits
-- category in `said | did | mixed | milestone | oops | wisdom | art | bedtime`
-- mood in `golden | chaotic | sweet | legendary | hilarious | heartwarming | facepalm | proud | bittersweet`
-
-All validation, authentication, invite, image, and general API errors returned to the Bulgarian client use Bulgarian wording. The static HTML also contains Bulgarian fallback copy before the locale bundle finishes loading.
-
-## Documentation Guard
-The repo includes a lightweight documentation guard:
-
-- `npm run docs:check` checks staged files in git, or accepts explicit file paths as arguments
-- if relevant app files changed under `public/`, `server/`, `server.js`, `package.json`, or `package-lock.json`, the guard expects at least one tracked Markdown doc (`docs/USER_GUIDE.md`, `docs/TECHNICAL.md`, or `docs/ADMIN.md`) to be updated in the same change
-- `npm run hooks:install` copies `.githooks/pre-commit` into `.git/hooks/pre-commit`
-- `npm install` also triggers the installer through the `prepare` script when the project is inside a git checkout
-- set `DOCS_GUARD_BYPASS=1` only for changes that are genuinely documentation-neutral
-
-Documentation conventions:
-- meaningful user-visible or maintenance-relevant changes should be reflected in the docs
-- `TECHNICAL.*` should stay in English
-- `USER_GUIDE.*` should stay concise, Bulgarian, and easy for non-technical users to scan
-- `ADMIN.*` should stay Bulgarian and focused on localhost-only maintenance tasks
-
-This does not replace judgment. The check exists to force a docs review whenever code changes are likely to affect behavior, UI, setup, API, auth/session handling, storage, or maintainability.
-
-## Static Assets
-- `public/favicon.svg`: browser favicon asset; uses a hand-drawn sun illustration inspired by the app background doodles aligned with the app's playful family archive theme
-- `public/background-scene.svg`: shared main/admin background illustration aligned to the blue, yellow, and green color bands
-- `public/emoticons.svg`: custom hand-drawn SVG symbol sprite used for inline text emotes in the editor, feed cards, and print export
-- `public/locales/bg.json`: Bulgarian UI strings
+The background illustration is fixed to the viewport. Its doodles are aligned with the sky, sand, and grass color bands.
 
 ## Internationalization
-The app ships a lightweight i18n layer (`public/js/i18n.js`) with no external dependencies.
 
-Key exports:
-- `initI18n(preferredLocale)`: loads the given locale (or default if unsupported), applies translations to the static DOM
-- `t(key, vars)`: returns the translated string for `key`; `vars` is an optional object of `{placeholder: value}` substitutions
-- `setLocale(lang)`: switches locale and re-applies translations to the static DOM (no storage side-effect - the caller decides where to persist)
-- `getLocale()`: returns the active locale code
-- `applyI18n()`: walks `[data-i18n]`, `[data-i18n-placeholder]`, and `[data-i18n-tooltip]` elements and sets their localized text/placeholder/tooltip data; also sets `document.documentElement.lang`
+`public/js/i18n.js` loads JSON locale files, applies `data-i18n`, placeholder, and tooltip attributes, and exposes `t()` for dynamic text. Only `bg` is currently supported.
 
-Supported locales:
-- `bg` - Bulgarian
+To add a locale, create a matching JSON file, add its code to `SUPPORTED`, and provide a UI selection and persistence flow. Server-side errors and rendered public pages also need translation work before the application can be considered multilingual.
 
-Adding a new locale:
-1. Create `public/locales/<code>.json` with the same keys as `bg.json`
-2. Add the code to the `SUPPORTED` array in `i18n.js`
-3. Re-enable a UI switcher in `app.js` and/or the auth/profile flows if you want runtime language switching
+## Verification and documentation workflow
 
-English support has been removed from the shipped UI, but the i18n layer remains in place so additional locales can be added later without refactoring the whole app.
+Available commands:
 
-## Responsive / Mobile
-Three CSS breakpoints in `public/css/style.css`:
+```bash
+npm test
+npm run docs:build
+npm run docs:html-check
+npm run docs:check
+npm run hooks:install
+```
 
-| Breakpoint | Target | Key changes |
-|---|---|---|
-| `≤ 860px` | Tablet | Single-column layout; sidebar unsticks and flows below feed |
-| `≤ 600px` | Phone | Base font 14px; nav eyebrow hidden, profile chip collapses to avatar only; toolbar stacks; editor and profile modal become bottom sheets (full-width, rounded top corners); entry card heads stack; config form goes 1-column |
-| `≤ 400px` | Small phone | Slightly smaller buttons; confirm dialog actions stack vertically |
+`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers auth, profiles, passwords, avatars, invites, family merge, children, entries, formatting tokens, photos, public feed, SEO routes, export, logout, and admin routes.
 
-Responsive UI is a standing requirement for this app:
-- new UI work must remain usable at tablet and phone widths, not just desktop
-- no new feature should introduce horizontal overflow for core screens, dialogs, forms, or alerts
-- action rows must wrap or stack cleanly for touch use
-- profile, auth, editor, kids, and invite flows should stay fully usable on mobile after future changes
+`docs/*.md` files are the source of truth. `npm run docs:build` regenerates standalone HTML equivalents, while `npm run docs:html-check` fails if generated HTML is stale.
+
+`npm run docs:check` examines staged application changes, requires a staged Markdown documentation update when behavior, API, storage, setup, or maintainability changed, and verifies that all generated HTML files match their Markdown sources. `DOCS_GUARD_BYPASS=1` skips only the relevance check and still checks HTML synchronization.

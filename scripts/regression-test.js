@@ -154,6 +154,19 @@ async function main() {
   result = await request('/api/howlers', {
     token: alpha,
     method: 'POST',
+    body: entryBody({ title: 'Default classification', category: '', mood: '' }),
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.entry.category, 'said');
+  assert.equal(result.body.entry.mood, 'golden');
+  assert.equal((await request(`/api/howlers/${result.body.entry.id}`, {
+    token: alpha,
+    method: 'DELETE',
+  })).status, 200);
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
     body: entryBody({
       title: 'Alpha [b]:happy: entry[/b]',
       quote: 'Hello [u]:love:[/u]',

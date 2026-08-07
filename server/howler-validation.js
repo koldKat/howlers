@@ -7,11 +7,11 @@ const VALID_CATEGORIES = new Set(['said', 'did', 'mixed', 'milestone', 'oops', '
 const VALID_MOODS = new Set(['golden', 'chaotic', 'sweet', 'legendary', 'hilarious', 'heartwarming', 'facepalm', 'proud', 'bittersweet']);
 
 function normalizeCategory(value) {
-  return value;
+  return value || 'said';
 }
 
 function normalizeMood(value) {
-  return value;
+  return value || 'golden';
 }
 
 function localDateString(date = new Date()) {
