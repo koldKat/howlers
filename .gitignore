@@ -1,16 +1,38 @@
-node_modules/
+# Application data
 backups/
-.local-node/
-
 database.sqlite
 database.sqlite-*
 
+# Dependencies and local runtimes
+node_modules/
+.local-node/
+
+# Environment and credentials
 .env
 .env.*
 !.env.example
+
+# Logs and runtime files
+logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.pid
+*.pid.lock
 
+# Generated output and caches
+coverage/
+.nyc_output/
+dist/
+build/
+.cache/
+.npm/
+*.tgz
+
+# Editor, operating system, and workspace files
 .DS_Store
+.vscode/
+.idea/
 .chmod_test
 .codex_write_test
