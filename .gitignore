@@ -34,5 +34,6 @@ build/
 .DS_Store
 .vscode/
 .idea/
+AGENTS.md
 .chmod_test
 .codex_write_test
