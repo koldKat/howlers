@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Семейни бисери</title>
+  <meta name="description" content="Семейни бисери е публична лента и личен семеен архив за смешни детски реплики, истории и малки семейни легенди.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Семейни бисери">
+  <meta property="og:description" content="Публична лента и личен семеен архив за смешни детски реплики, истории и малки семейни легенди.">
+  <meta name="twitter:card" content="summary">
+  <link rel="canonical" href="/">
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- ── Sticky nav bar ── -->
+  <nav class="site-nav">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <span class="nav-eyebrow" data-i18n="auth_eyebrow">Личен дневник</span>
+        <span class="nav-title" data-i18n="app_name">Семейни бисери</span>
+        <span class="nav-subtitle" data-i18n="nav_subtitle">Реплики, случки и малки легенди</span>
+      </div>
+      <div class="nav-actions">
+        <button id="nav-add-btn" class="primary-btn small-btn" style="display:none" data-i18n="open_editor_btn">Нов запис</button>
+        <button id="nav-viewer" class="viewer-chip nav-profile-btn" style="display:none" type="button" aria-label="Моят профил">
+          <span class="nav-avatar-wrap">
+            <img id="nav-avatar-img" class="nav-avatar-img" src="" alt="" style="display:none">
+            <span id="nav-avatar-initials" class="nav-avatar-initials"></span>
+          </span>
+          <span id="nav-viewer-name"></span>
+          <span id="nav-attention-badge" class="nav-attention-badge" style="display:none" aria-hidden="true"></span>
+        </button>
+        <button id="nav-logout-btn" class="ghost-btn small-btn" style="display:none" data-i18n="logout_btn">Изход</button>
+        <button id="nav-login-btn" class="primary-btn small-btn" data-i18n="feed_login_btn">Вход</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Page body ── -->
+  <div class="page-layout" id="page-layout">
+
+    <!-- Feed column (always visible) -->
+    <div class="feed-col">
+      <div class="feed-toolbar" id="feed-toolbar" style="display:none">
+        <input type="search" id="search-input" data-i18n-placeholder="placeholder_search" placeholder="Търсене по дете, заглавие, реплика, история или таг">
+      </div>
+      <div class="feed-kicker-row" id="feed-kicker-row" style="display:none">
+        <span id="archive-kicker" class="panel-kicker"></span>
+      </div>
+      <button id="invite-alert" class="invite-alert" type="button" style="display:none">
+        <span class="invite-alert-badge" data-i18n="invite_alert_badge">Чака</span>
+        <span class="invite-alert-copy">
+          <strong id="invite-alert-title">Чака покана за семеен архив</strong>
+          <small id="invite-alert-subtitle">Отвори профила, за да я прегледаш.</small>
+        </span>
+      </button>
+      <div id="feed-list" class="stack-list"></div>
+    </div>
+
+    <!-- Sidebar (logged-in only) -->
+    <aside id="feed-sidebar" style="display:none">
+      <div class="panel sidebar-stats-panel">
+        <div class="panel-head">
+          <h2 data-i18n="panel_summary_title">Семеен преглед</h2>
+          <span class="panel-kicker" id="summary-kicker"></span>
+        </div>
+        <p class="sidebar-meta" id="hero-meta"></p>
+        <div class="stats-grid stats-grid-three">
+          <article class="stat-card accent-orange">
+            <div class="stat-card-text">
+              <span class="stat-label" data-i18n="stat_label_total">Записани моменти</span>
+              <small id="total-sub"></small>
+            </div>
+            <strong id="total-stat">0</strong>
+          </article>
+          <article class="stat-card accent-cyan">
+            <div class="stat-card-text">
+              <span class="stat-label" data-i18n="stat_label_favorites">Любими</span>
+              <small id="favorite-sub"></small>
+            </div>
+            <strong id="favorite-stat">0</strong>
+          </article>
+          <article class="stat-card accent-green">
+            <div class="stat-card-text">
+              <span class="stat-label" data-i18n="stat_label_kids">Деца</span>
+              <small id="kids-sub"></small>
+            </div>
+            <strong id="kids-stat">0</strong>
+          </article>
+        </div>
+        <div class="summary-strips">
+          <div>
+            <span class="strip-label" data-i18n="strip_label_categories">Категории</span>
+            <div id="category-strip" class="chip-row"></div>
+          </div>
+          <div>
+            <span class="strip-label" data-i18n="strip_label_kids">Деца</span>
+            <div id="kids-strip" class="chip-row"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel kids-panel" id="kids-panel">
+        <div class="panel-head">
+          <h2 data-i18n="panel_kids_title">Нашите деца</h2>
+        </div>
+        <div id="kids-panel-list"></div>
+        <form class="kid-add-form" id="kid-add-form" autocomplete="off">
+          <input type="text" id="kid-name-input" maxlength="60"
+            data-i18n-placeholder="kids_add_placeholder_name" placeholder="Име или прякор">
+          <input type="date" id="kid-dob-input" aria-label="Дата на раждане">
+          <button type="submit" class="primary-btn small-btn" data-i18n="kids_add_btn">Добави</button>
+        </form>
+        <div id="kid-add-error" class="inline-error"></div>
+      </div>
+
+    </aside>
+
+    <!-- Sidebar (guest only) -->
+    <aside id="guest-sidebar" style="display:none">
+      <div class="panel guest-promo-panel">
+        <div class="panel-head">
+          <h2 data-i18n="guest_promo_title">Какво е това?</h2>
+          <span class="panel-kicker" data-i18n="guest_promo_kicker">Семеен архив за бисери</span>
+        </div>
+
+        <div class="promo-card accent-cyan">
+          <strong data-i18n="guest_promo_private_title">Не всичко е за публиката</strong>
+          <p data-i18n="guest_promo_private_text">По подразбиране записите са лични. Виждат ги само ти и родителите, които поканиш.</p>
+        </div>
+        <div class="promo-card accent-orange">
+          <strong data-i18n="guest_promo_public_title">Някои бисери са за споделяне</strong>
+          <p data-i18n="guest_promo_public_text">Ако нещо е твърде добро само за семейния чат, правиш го публично. Останалото си остава лично.</p>
+        </div>
+        <div class="promo-card accent-green">
+          <strong data-i18n="guest_promo_memory_title">Преди да стане „как беше точно?“</strong>
+          <p data-i18n="guest_promo_memory_text">Записваш репликата веднага, докато още помниш кой какво каза и защо всички се смяха.</p>
+        </div>
+        <div class="promo-card accent-slate">
+          <strong data-i18n="guest_promo_photo_title">Има и снимков материал</strong>
+          <p data-i18n="guest_promo_photo_text">Когато само текстът не стига, добавяш снимка. За протокола.</p>
+        </div>
+        <div class="promo-card accent-cyan">
+          <strong data-i18n="guest_promo_search_title">Без археология в чатовете</strong>
+          <p data-i18n="guest_promo_search_text">Търсиш по дете, заглавие, текст или таг, вместо да ровиш в чатове три години назад.</p>
+        </div>
+        <div class="promo-card accent-orange">
+          <strong data-i18n="guest_promo_parents_title">Не разчитай само на своята памет</strong>
+          <p data-i18n="guest_promo_parents_text">Покани друг родител, за да добавяте бисери заедно. Някой все ще помни продължението.</p>
+        </div>
+        <div class="promo-card accent-green">
+          <strong data-i18n="guest_promo_export_title">За баби, дядовци и принтери</strong>
+          <p data-i18n="guest_promo_export_text">Архивът може да се изтегли като TXT или да се запази като PDF, ако някой поиска „да го има на хартия“.</p>
+        </div>
+
+        <div class="guest-promo-actions">
+          <button id="guest-login-btn" class="primary-btn small-btn" type="button" data-i18n="guest_promo_cta">Създай личен архив</button>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- ── Auth modal ── -->
+  <div id="auth-modal" style="display:none">
+    <div class="auth-card">
+      <button id="close-auth-btn" class="modal-close-btn" type="button" aria-label="Затвори">&times;</button>
+      <p class="eyebrow" data-i18n="auth_eyebrow">Личен дневник</p>
+      <h1 data-i18n="app_name">Семейни бисери</h1>
+      <p class="auth-copy" data-i18n="auth_copy">Записвайте случайните реплики, малките катастрофи и легендарните моменти, преди да изчезнат.</p>
+      <div class="auth-form">
+        <input type="text" id="auth-username" placeholder="Потребителско име" autocomplete="username">
+        <input type="password" id="auth-password" placeholder="Парола" autocomplete="current-password">
+        <div id="auth-error" class="inline-error"></div>
+        <div class="actions-row auth-actions">
+          <button id="login-btn" class="primary-btn" data-i18n="login_btn">Вход</button>
+          <button id="register-btn" class="ghost-btn" data-i18n="register_btn">Регистрация</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Confirm overlay ── -->
+  <div id="confirm-overlay">
+    <div id="confirm-dialog">
+      <div class="confirm-eyebrow" data-i18n="confirm_eyebrow">Потвърждаване</div>
+      <h2 id="confirm-title">Изтриване на запис</h2>
+      <p id="confirm-message">Това ще премахне избрания запис завинаги.</p>
+      <div class="confirm-actions">
+        <button id="confirm-cancel" type="button" data-i18n="confirm_cancel">Отказ</button>
+        <button id="confirm-ok" type="button">Изтрий</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Editor overlay ── -->
+  <div id="editor-overlay">
+    <div id="editor-dialog" class="panel">
+      <div class="panel-head">
+        <div class="dialog-heading">
+          <h2 id="editor-title">Добави запис</h2>
+          <span class="panel-kicker" id="editor-kicker">Нов момент</span>
+        </div>
+        <button id="close-editor-btn" class="modal-close-btn" type="button" aria-label="Затвори">&times;</button>
+      </div>
+      <p id="editor-intro" class="editor-intro" data-i18n="editor_intro">Запиши само най-важното. Останалото е по желание.</p>
+      <form class="config-grid">
+        <input type="hidden" id="entry-id">
+        <label>
+          <span data-i18n="form_label_child">Дете</span>
+          <div class="child-picker-stack">
+            <select id="child-select">
+              <option value="" data-i18n="child_select_placeholder">Избери добавено дете</option>
+            </select>
+            <input type="text" id="child-name" data-i18n-placeholder="placeholder_child" placeholder="Мила" autocomplete="off">
+          </div>
+          <small class="field-hint" data-i18n="child_picker_hint">Избери от добавените деца или въведи ново име.</small>
+          <small id="child-age-preview" class="field-hint child-age-preview" hidden></small>
+        </label>
+        <label class="wide">
+          <span data-i18n="form_label_title">Заглавие</span>
+          <input type="text" id="title" data-i18n-placeholder="placeholder_title" placeholder="Луната ни следва до вкъщи">
+          <div class="text-format-toolbar" data-format-target="title" aria-label="Форматиране на заглавието"></div>
+          <div class="inline-emote-picker" data-emote-target="title" aria-label="Добави емотикон в заглавието"></div>
+        </label>
+        <label class="wide">
+          <span data-i18n="form_label_content">Запис</span>
+          <textarea id="content" rows="7" data-i18n-placeholder="placeholder_content" placeholder="Запиши точната реплика и какво се случи."></textarea>
+          <div class="text-format-toolbar" data-format-target="content" aria-label="Форматиране на записа"></div>
+          <div class="inline-emote-picker" data-emote-target="content" aria-label="Добави емотикон в записа"></div>
+        </label>
+        <div class="wide post-photo-field">
+          <span class="post-photo-label" data-i18n="form_label_photo">Снимка</span>
+          <div class="post-photo-actions">
+            <label for="post-photo-input" class="ghost-btn small-btn post-photo-upload" data-i18n="post_photo_choose">Добави снимка</label>
+            <button id="remove-post-photo-btn" class="ghost-btn small-btn danger-btn" type="button" hidden data-i18n="post_photo_remove">Премахни</button>
+          </div>
+          <input id="post-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+          <img id="post-photo-preview" class="post-photo-preview" src="" alt="" hidden>
+          <small id="post-photo-status" class="field-hint" data-i18n="post_photo_hint">Големите снимки се намаляват автоматично до максимум 512 KB.</small>
+        </div>
+        <div class="editor-advanced-toggle-row wide">
+          <button id="editor-advanced-toggle" class="ghost-btn small-btn editor-advanced-toggle" type="button" aria-expanded="false" data-i18n="editor_advanced_show">Още настройки</button>
+        </div>
+        <div id="editor-advanced" class="editor-advanced wide" hidden>
+          <div class="editor-advanced-grid">
+            <label>
+              <span data-i18n="form_label_date">Дата</span>
+              <input type="date" id="happened-on">
+            </label>
+            <label>
+              <span data-i18n="form_label_category">Категория</span>
+              <select id="category">
+                <option value="" data-i18n="form_select_category_placeholder">Без категория</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="form_label_mood">Настроение</span>
+              <select id="mood">
+                <option value="" data-i18n="form_select_mood_placeholder">Без настроение</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="form_label_age_note">Бележка за възраст</span>
+              <input type="text" id="age-note" data-i18n-placeholder="placeholder_age_note" placeholder="4 години 2 месеца">
+            </label>
+            <label class="wide">
+              <span data-i18n="form_label_tags">Тагове</span>
+              <input type="text" id="tags" data-i18n-placeholder="placeholder_tags" placeholder="лягане, храна, кола">
+            </label>
+            <label class="checkbox-row checkbox-card wide">
+              <input type="checkbox" id="is-favorite">
+              <span class="check-indicator" aria-hidden="true"></span>
+              <span class="check-copy">
+                <strong data-i18n="form_label_favorite_strong">Добави към семейни любими</strong>
+                <small data-i18n="form_label_favorite_small">Пазете най-добрите истории близо до ръка.</small>
+              </span>
+            </label>
+            <label class="checkbox-row checkbox-card wide">
+              <input type="checkbox" id="is-public">
+              <span class="check-indicator" aria-hidden="true"></span>
+              <span class="check-copy">
+                <strong data-i18n="form_label_public_strong">Публичен</strong>
+                <small data-i18n="form_label_public_small">Видим за всички, дори без акаунт</small>
+              </span>
+            </label>
+          </div>
+        </div>
+      </form>
+      <div class="actions-row editor-actions">
+        <button id="save-btn" class="primary-btn" type="button" data-i18n="save_btn">Запази</button>
+        <button id="reset-btn" class="ghost-btn" type="button" data-i18n="reset_btn">Изчисти</button>
+        <button id="delete-btn" class="ghost-btn danger-btn" type="button" style="display:none" data-i18n="delete_btn">Изтрий</button>
+      </div>
+      <div id="form-error" class="inline-error"></div>
+    </div>
+  </div>
+
+  <!-- ── Profile modal ── -->
+  <div id="profile-modal" style="display:none">
+    <div id="profile-card" class="profile-card panel">
+      <div class="panel-head">
+        <h2 data-i18n="profile_title">Моят профил</h2>
+        <button id="close-profile-btn" class="modal-close-btn" type="button" aria-label="Затвори">&times;</button>
+      </div>
+
+      <div id="profile-attention-section" class="profile-section profile-attention-section" style="display:none">
+        <div class="profile-section-head" data-i18n="profile_section_attention">Нуждае се от внимание</div>
+        <div id="profile-incoming-invites" class="profile-list"></div>
+      </div>
+
+      <div id="profile-attention-divider" class="profile-divider" style="display:none"></div>
+
+      <div class="profile-avatar-section">
+        <div class="avatar-upload-wrap">
+          <img id="profile-avatar-preview" class="avatar-large" src="" alt="" style="display:none">
+          <span id="profile-avatar-initials" class="avatar-initials-large"></span>
+          <label
+            for="avatar-file-input"
+            class="avatar-upload-hint"
+            data-i18n-tooltip="profile_avatar_hint"
+            data-tooltip="Качи снимка"
+            aria-label="Качи снимка"
+          >
+            <span class="avatar-upload-icon" aria-hidden="true">+</span>
+          </label>
+          <input type="file" id="avatar-file-input" accept="image/*" aria-label="Качи профилна снимка">
+        </div>
+        <button id="remove-avatar-btn" class="ghost-btn small-btn danger-btn" type="button" style="display:none" data-i18n="profile_remove_avatar">Премахни снимката</button>
+      </div>
+
+      <div class="profile-section">
+        <div class="profile-section-head" data-i18n="profile_section_identity">Самоличност</div>
+        <label class="profile-field">
+          <span data-i18n="profile_display_name">Показвано име</span>
+          <input type="text" id="profile-display-name" maxlength="60" data-i18n-placeholder="profile_display_name_placeholder" placeholder="Твоето име">
+        </label>
+        <label class="profile-field">
+          <span data-i18n="profile_username_label">Потребителско име</span>
+          <input type="text" id="profile-username-ro" readonly>
+        </label>
+        <div id="profile-identity-error" class="inline-error"></div>
+        <div class="actions-row">
+          <button id="save-identity-btn" class="primary-btn small-btn" type="button" data-i18n="profile_save_identity">Запази промените</button>
+        </div>
+      </div>
+
+      <div class="profile-divider"></div>
+
+      <div class="profile-section">
+        <div class="profile-section-head" data-i18n="profile_section_password">Смяна на парола</div>
+        <label class="profile-field">
+          <span data-i18n="profile_current_password">Текуща парола</span>
+          <input type="password" id="profile-current-pw" autocomplete="current-password">
+        </label>
+        <label class="profile-field">
+          <span data-i18n="profile_new_password">Нова парола</span>
+          <input type="password" id="profile-new-pw" autocomplete="new-password">
+        </label>
+        <label class="profile-field">
+          <span data-i18n="profile_confirm_password">Потвърди новата парола</span>
+          <input type="password" id="profile-confirm-pw" autocomplete="new-password">
+        </label>
+        <div id="profile-pw-error" class="inline-error"></div>
+        <div class="actions-row">
+          <button id="save-password-btn" class="primary-btn small-btn" type="button" data-i18n="profile_save_password">Обнови паролата</button>
+        </div>
+      </div>
+
+      <div class="profile-divider"></div>
+
+      <div class="profile-section">
+        <div class="profile-section-head" data-i18n="profile_section_family">Семеен архив</div>
+        <div id="profile-family-list" class="profile-list"></div>
+        <label class="profile-field">
+          <span data-i18n="profile_invite_username">Покани по потребителско име</span>
+          <input type="text" id="profile-invite-username" maxlength="60" autocomplete="off" data-i18n-placeholder="profile_invite_username_placeholder" placeholder="напр. mariya83">
+        </label>
+        <div class="actions-row">
+          <button id="profile-send-invite-btn" class="primary-btn small-btn" type="button" data-i18n="profile_send_invite">Покани друг родител</button>
+        </div>
+        <div id="profile-invite-error" class="inline-error"></div>
+        <div class="profile-subsection">
+          <div class="profile-subhead" data-i18n="profile_outgoing_invites">Чакащи покани</div>
+          <div id="profile-outgoing-invites" class="profile-list"></div>
+        </div>
+      </div>
+
+      <div class="profile-divider"></div>
+
+      <div class="profile-section">
+        <div class="profile-section-head" data-i18n="profile_section_export">Експорт на семейния архив</div>
+        <div class="actions-row">
+          <button id="export-txt-btn" class="primary-btn small-btn" type="button" data-i18n="profile_export_txt">Изтегли като TXT</button>
+          <button id="export-pdf-btn" class="primary-btn small-btn" type="button" data-i18n="profile_export_pdf">Печат / Запази като PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

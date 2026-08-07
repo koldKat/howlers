@@ -1,0 +1,131 @@
+export function getAppElements() {
+  return {
+    // Nav
+    navLoginBtn:   document.getElementById('nav-login-btn'),
+    navAddBtn:     document.getElementById('nav-add-btn'),
+    navViewer:     document.getElementById('nav-viewer'),
+    navViewerName: document.getElementById('nav-viewer-name'),
+    navAvatarImg:  document.getElementById('nav-avatar-img'),
+    navAvatarInitials: document.getElementById('nav-avatar-initials'),
+    navAttentionBadge: document.getElementById('nav-attention-badge'),
+    navLogoutBtn:  document.getElementById('nav-logout-btn'),
+    // Auth modal
+    authModal:     document.getElementById('auth-modal'),
+    closeAuthBtn:  document.getElementById('close-auth-btn'),
+    authUsername:  document.getElementById('auth-username'),
+    authPassword:  document.getElementById('auth-password'),
+    authError:     document.getElementById('auth-error'),
+    loginBtn:      document.getElementById('login-btn'),
+    registerBtn:   document.getElementById('register-btn'),
+    // Profile modal
+    profileModal:          document.getElementById('profile-modal'),
+    profileCard:           document.getElementById('profile-card'),
+    closeProfileBtn:       document.getElementById('close-profile-btn'),
+    avatarFileInput:       document.getElementById('avatar-file-input'),
+    profileAvatarPreview:  document.getElementById('profile-avatar-preview'),
+    profileAvatarInitials: document.getElementById('profile-avatar-initials'),
+    removeAvatarBtn:       document.getElementById('remove-avatar-btn'),
+    profileDisplayName:    document.getElementById('profile-display-name'),
+    profileUsernameRo:     document.getElementById('profile-username-ro'),
+    profileIdentityError:  document.getElementById('profile-identity-error'),
+    saveIdentityBtn:       document.getElementById('save-identity-btn'),
+    profileFamilyList:     document.getElementById('profile-family-list'),
+    profileInviteUsername: document.getElementById('profile-invite-username'),
+    profileInviteError:    document.getElementById('profile-invite-error'),
+    profileAttentionSection: document.getElementById('profile-attention-section'),
+    profileAttentionDivider: document.getElementById('profile-attention-divider'),
+    profileIncomingInvites:document.getElementById('profile-incoming-invites'),
+    profileOutgoingInvites:document.getElementById('profile-outgoing-invites'),
+    profileSendInviteBtn:  document.getElementById('profile-send-invite-btn'),
+    profileCurrentPw:      document.getElementById('profile-current-pw'),
+    profileNewPw:          document.getElementById('profile-new-pw'),
+    profileConfirmPw:      document.getElementById('profile-confirm-pw'),
+    profilePwError:        document.getElementById('profile-pw-error'),
+    savePasswordBtn:       document.getElementById('save-password-btn'),
+    exportTxtBtn:          document.getElementById('export-txt-btn'),
+    exportPdfBtn:          document.getElementById('export-pdf-btn'),
+    // Kids panel
+    kidsPanel:     document.getElementById('kids-panel'),
+    kidsPanelList: document.getElementById('kids-panel-list'),
+    kidNameInput:  document.getElementById('kid-name-input'),
+    kidDobInput:   document.getElementById('kid-dob-input'),
+    kidAddForm:    document.getElementById('kid-add-form'),
+    kidAddError:   document.getElementById('kid-add-error'),
+    // Feed / sidebar
+    feedToolbar:   document.getElementById('feed-toolbar'),
+    feedKickerRow: document.getElementById('feed-kicker-row'),
+    archiveKicker: document.getElementById('archive-kicker'),
+    inviteAlert:   document.getElementById('invite-alert'),
+    inviteAlertTitle: document.getElementById('invite-alert-title'),
+    inviteAlertSubtitle: document.getElementById('invite-alert-subtitle'),
+    feedList:      document.getElementById('feed-list'),
+    feedSidebar:   document.getElementById('feed-sidebar'),
+    guestSidebar:  document.getElementById('guest-sidebar'),
+    guestLoginBtn: document.getElementById('guest-login-btn'),
+    summaryKicker: document.getElementById('summary-kicker'),
+    heroMeta:      document.getElementById('hero-meta'),
+    totalStat:     document.getElementById('total-stat'),
+    totalSub:      document.getElementById('total-sub'),
+    favoriteStat:  document.getElementById('favorite-stat'),
+    favoriteSub:   document.getElementById('favorite-sub'),
+    kidsStat:      document.getElementById('kids-stat'),
+    kidsSub:       document.getElementById('kids-sub'),
+    categoryStrip: document.getElementById('category-strip'),
+    kidsStrip:     document.getElementById('kids-strip'),
+    // Editor overlay
+    editorOverlay: document.getElementById('editor-overlay'),
+    entryId:       document.getElementById('entry-id'),
+    childSelect:   document.getElementById('child-select'),
+    childName:     document.getElementById('child-name'),
+    childAgePreview: document.getElementById('child-age-preview'),
+    happenedOn:    document.getElementById('happened-on'),
+    title:         document.getElementById('title'),
+    category:      document.getElementById('category'),
+    mood:          document.getElementById('mood'),
+    content:       document.getElementById('content'),
+    postPhotoInput: document.getElementById('post-photo-input'),
+    postPhotoPreview: document.getElementById('post-photo-preview'),
+    postPhotoStatus: document.getElementById('post-photo-status'),
+    removePostPhotoBtn: document.getElementById('remove-post-photo-btn'),
+    ageNote:       document.getElementById('age-note'),
+    tags:          document.getElementById('tags'),
+    isFavorite:    document.getElementById('is-favorite'),
+    isPublic:      document.getElementById('is-public'),
+    saveBtn:       document.getElementById('save-btn'),
+    resetBtn:      document.getElementById('reset-btn'),
+    deleteBtn:     document.getElementById('delete-btn'),
+    formError:     document.getElementById('form-error'),
+    editorTitle:   document.getElementById('editor-title'),
+    editorKicker:  document.getElementById('editor-kicker'),
+    editorAdvanced: document.getElementById('editor-advanced'),
+    editorAdvancedToggle: document.getElementById('editor-advanced-toggle'),
+    closeEditorBtn:document.getElementById('close-editor-btn'),
+    searchInput:   document.getElementById('search-input'),
+    // Confirm overlay
+    confirmOverlay:document.getElementById('confirm-overlay'),
+    confirmTitle:  document.getElementById('confirm-title'),
+    confirmMessage:document.getElementById('confirm-message'),
+    confirmOk:     document.getElementById('confirm-ok'),
+    confirmCancel: document.getElementById('confirm-cancel'),
+  };
+}
+
+export function bindBackdropDismiss(overlay, dismiss) {
+  let backdropPress = null;
+  overlay.addEventListener('pointerdown', event => {
+    backdropPress = event.target === overlay
+      ? { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
+      : null;
+  });
+  overlay.addEventListener('pointerup', event => {
+    if (!backdropPress || event.pointerId !== backdropPress.pointerId) return;
+    const moved = Math.hypot(
+      event.clientX - backdropPress.x,
+      event.clientY - backdropPress.y
+    );
+    const shouldDismiss = event.target === overlay && moved <= 6;
+    backdropPress = null;
+    if (shouldDismiss) dismiss();
+  });
+  overlay.addEventListener('pointercancel', () => { backdropPress = null; });
+}

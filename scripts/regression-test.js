@@ -1,0 +1,500 @@
+#!/usr/bin/env node
+
+const assert = require('assert/strict');
+const { spawn } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'howlers-regression-'));
+const databasePath = path.join(tempDir, 'database.sqlite');
+const port = 3197;
+const baseUrl = `http://127.0.0.1:${port}`;
+const root = path.join(__dirname, '..');
+const TINY_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+const server = spawn(process.execPath, ['server.js'], {
+  cwd: root,
+  env: {
+    ...process.env,
+    PORT: String(port),
+    DATABASE_PATH: databasePath,
+    DISABLE_BACKUPS: '1',
+  },
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+
+let serverOutput = '';
+server.stdout.on('data', chunk => { serverOutput += chunk; });
+server.stderr.on('data', chunk => { serverOutput += chunk; });
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function waitForServer() {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    if (server.exitCode !== null) throw new Error(`Server exited early:\n${serverOutput}`);
+    try {
+      const response = await fetch(`${baseUrl}/api/feed`);
+      if (response.ok) return;
+    } catch {}
+    await sleep(50);
+  }
+  throw new Error(`Server did not start:\n${serverOutput}`);
+}
+
+async function request(pathname, { token, method = 'GET', body, raw = false } = {}) {
+  const headers = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const response = await fetch(`${baseUrl}${pathname}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return {
+    status: response.status,
+    body: raw ? await response.text() : await response.json(),
+  };
+}
+
+async function register(username, password = 'secret12') {
+  const result = await request('/api/register', {
+    method: 'POST',
+    body: { username, password },
+  });
+  assert.equal(result.status, 200);
+  assert.ok(result.body.token);
+  return result.body.token;
+}
+
+function entryBody(overrides = {}) {
+  return {
+    childName: 'Mila',
+    title: 'Test entry',
+    quote: 'Hello',
+    story: '',
+    category: 'said',
+    happenedOn: '2026-06-01',
+    ageNote: '4',
+    mood: 'golden',
+    photo: '',
+    tags: ['family', 'test'],
+    isFavorite: true,
+    isPublic: false,
+    ...overrides,
+  };
+}
+
+function localDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+async function main() {
+  await waitForServer();
+
+  let result = await request('/%E0%A4%A', { raw: true });
+  assert.equal(result.status, 400);
+  assert.match(result.body, /Невалиден адрес/);
+
+  result = await request('/emoticons.svg', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /<symbol id="happy"/);
+  assert.match(result.body, /<symbol id="proud"/);
+  assert.match(result.body, /<symbol id="angry"/);
+  assert.match(result.body, /<symbol id="cool"/);
+
+  const alpha = await register('alpha');
+  const beta = await register('beta');
+  const gamma = await register('gamma');
+  await register('koldkat');
+
+  result = await request('/api/profile', {
+    token: alpha,
+    method: 'PATCH',
+    body: { displayName: 'x'.repeat(2 * 1024 * 1024) },
+  });
+  assert.equal(result.status, 413);
+  assert.equal(result.body.error, 'Заявката е прекалено голяма.');
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({ childName: '' }),
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Името на детето е задължително.');
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({ happenedOn: '2026-02-30' }),
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Въведи валидна дата във формат ГГГГ-ММ-ДД.');
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({ category: 'invented' }),
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Невалиден вид на записа.');
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({ mood: 'invented' }),
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Невалидно настроение.');
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({
+      title: 'Alpha [b]:happy: entry[/b]',
+      quote: 'Hello [u]:love:[/u]',
+      story: 'Original story details.',
+      photo: TINY_PNG,
+      isPublic: true,
+    }),
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.entry.title, 'Alpha [b]:happy: entry[/b]');
+  assert.equal(result.body.entry.quote, 'Hello [u]:love:[/u]');
+  assert.equal(result.body.entry.story, 'Original story details.');
+  assert.equal(result.body.entry.content, 'Hello [u]:love:[/u]\n\nOriginal story details.');
+  assert.equal(result.body.entry.photo, TINY_PNG);
+  assert.equal(result.body.state.entries.some(entry => entry.id === result.body.entry.id), true);
+  const alphaEntryId = result.body.entry.id;
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({
+      title: 'Auto-dated entry',
+      happenedOn: '',
+      isPublic: false,
+    }),
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.entry.happenedOn, localDateString());
+  assert.equal((await request(`/api/howlers/${result.body.entry.id}`, {
+    token: alpha,
+    method: 'DELETE',
+  })).status, 200);
+
+  const oversizedPhoto = `data:image/png;base64,${Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.alloc(512 * 1024),
+  ]).toString('base64')}`;
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({ title: 'Oversized photo', photo: oversizedPhoto }),
+  });
+  assert.equal(result.status, 400);
+
+  result = await request('/api/kids', {
+    token: beta,
+    method: 'POST',
+    body: { name: 'Niki', dob: '2021-05-04' },
+  });
+  assert.equal(result.status, 200);
+  const betaKidId = result.body.kid.id;
+
+  result = await request('/api/howlers', {
+    token: beta,
+    method: 'POST',
+    body: entryBody({
+      childName: 'Niki',
+      title: 'Beta entry',
+      quote: '',
+      story: 'Before merge',
+      category: 'did',
+      happenedOn: '',
+      mood: 'sweet',
+      tags: 'merge',
+      isFavorite: false,
+    }),
+  });
+  assert.equal(result.status, 200);
+  const betaEntryId = result.body.entry.id;
+
+  result = await request('/api/family/invites', {
+    token: alpha,
+    method: 'POST',
+    body: { username: 'gamma' },
+  });
+  assert.equal(result.status, 200);
+  const cancelledInviteId = result.body.inviteId;
+
+  result = await request('/api/family/invites', {
+    token: alpha,
+    method: 'POST',
+    body: { username: 'gamma' },
+  });
+  assert.equal(result.status, 400);
+
+  result = await request('/api/profile', { token: gamma });
+  assert.equal(result.body.incomingInvites[0].id, cancelledInviteId);
+
+  result = await request(`/api/family/invites/${cancelledInviteId}/accept`, {
+    token: beta,
+    method: 'POST',
+  });
+  assert.equal(result.status, 400);
+
+  result = await request(`/api/family/invites/${cancelledInviteId}`, {
+    token: alpha,
+    method: 'DELETE',
+  });
+  assert.equal(result.status, 200);
+  result = await request('/api/profile', { token: gamma });
+  assert.equal(result.body.incomingInvites.length, 0);
+  result = await request('/api/profile', { token: alpha });
+  assert.equal(result.body.outgoingInvites.length, 0);
+
+  result = await request('/api/family/invites', {
+    token: alpha,
+    method: 'POST',
+    body: { username: 'beta' },
+  });
+  assert.equal(result.status, 200);
+  const mergeInviteId = result.body.inviteId;
+
+  result = await request('/api/state', { token: beta });
+  assert.equal(result.body.attention.pendingInviteCount, 1);
+  assert.equal(result.body.attention.pendingInviteSenders[0].username, 'alpha');
+
+  result = await request(`/api/family/invites/${mergeInviteId}/accept`, {
+    token: beta,
+    method: 'POST',
+  });
+  assert.equal(result.status, 200);
+
+  const alphaState = await request('/api/state', { token: alpha });
+  const betaState = await request('/api/state', { token: beta });
+  assert.deepEqual(
+    alphaState.body.entries.map(entry => entry.id).sort(),
+    [alphaEntryId, betaEntryId].sort()
+  );
+  assert.deepEqual(
+    betaState.body.entries.map(entry => entry.id).sort(),
+    [alphaEntryId, betaEntryId].sort()
+  );
+  assert.equal(alphaState.body.kids.some(kid => kid.id === betaKidId), true);
+  assert.equal(betaState.body.profile.familyMembers.length, 2);
+  assert.equal(alphaState.body.viewer.id, alphaState.body.profile.id);
+  assert.equal(alphaState.body.viewer.locale, 'bg');
+  assert.ok(Number.isInteger(alphaState.body.viewer.familyId));
+  assert.equal(alphaState.body.viewer.familyId, betaState.body.viewer.familyId);
+
+  result = await request('/api/family/invites', {
+    token: alpha,
+    method: 'POST',
+    body: { username: 'beta' },
+  });
+  assert.equal(result.status, 400);
+
+  result = await request(`/api/howlers/${alphaEntryId}`, {
+    token: beta,
+    method: 'PUT',
+    body: entryBody({
+      title: 'Edited [b]:laugh: by beta[/b]',
+      quote: undefined,
+      story: undefined,
+      content: 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]',
+      photo: TINY_PNG,
+      category: 'mixed',
+      mood: 'hilarious',
+      tags: ['shared'],
+      isFavorite: false,
+      isPublic: true,
+    }),
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.entry.title, 'Edited [b]:laugh: by beta[/b]');
+  assert.equal(result.body.entry.quote, '');
+  assert.equal(result.body.entry.story, 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]');
+  assert.equal(result.body.entry.content, 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]');
+  assert.equal(result.body.entry.photo, TINY_PNG);
+  assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photo, TINY_PNG);
+
+  result = await request('/api/feed');
+  assert.equal(result.body.some(entry => entry.id === alphaEntryId), true);
+  assert.equal(result.body.find(entry => entry.id === alphaEntryId).title, 'Edited [b]:laugh: by beta[/b]');
+  assert.match(result.body.find(entry => entry.id === alphaEntryId).content, /Shared \[u\]:surprised:/);
+  assert.equal(result.body.find(entry => entry.id === alphaEntryId).photo, TINY_PNG);
+  assert.deepEqual(result.body.find(entry => entry.id === alphaEntryId).tags, []);
+  assert.equal(result.body.some(entry => entry.id === betaEntryId), false);
+
+  result = await request('/api/state', { token: alpha });
+  assert.deepEqual(result.body.entries.find(entry => entry.id === alphaEntryId).tags, ['shared']);
+
+  result = await request('/sitemap.xml', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, new RegExp(`<loc>http://127\\.0\\.0\\.1:${port}/</loc>`));
+  assert.match(result.body, new RegExp(`<loc>http://127\\.0\\.0\\.1:${port}/posts/${alphaEntryId}</loc>`));
+  assert.doesNotMatch(result.body, new RegExp(`/posts/${betaEntryId}</loc>`));
+
+  result = await request('/robots.txt', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, new RegExp(`Sitemap: http://127\\.0\\.0\\.1:${port}/sitemap\\.xml`));
+  assert.match(result.body, /Disallow: \/api\//);
+
+  result = await request(`/posts/${alphaEntryId}`, { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /<link rel="canonical"/);
+  assert.match(result.body, /Семейни бисери/);
+  assert.match(result.body, /"datePublished":"\d{4}-\d{2}-\d{2}T/);
+  assert.doesNotMatch(result.body, /shared/);
+
+  result = await request(`/posts/${betaEntryId}`, { raw: true });
+  assert.equal(result.status, 404);
+
+  result = await request('/api/profile', {
+    token: alpha,
+    method: 'PATCH',
+    body: { displayName: 'Alpha Parent' },
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.displayName, 'Alpha Parent');
+  assert.equal(result.body.profile.displayName, 'Alpha Parent');
+  assert.equal(result.body.profile.username, 'alpha');
+
+  result = await request('/api/profile', { token: alpha });
+  assert.equal(result.body.displayName, 'Alpha Parent');
+
+  result = await request('/api/profile/avatar', {
+    token: alpha,
+    method: 'POST',
+    body: { avatar: TINY_PNG },
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.avatar, TINY_PNG);
+  result = await request('/api/profile/avatar', {
+    token: alpha,
+    method: 'POST',
+    body: { avatar: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' },
+  });
+  assert.equal(result.status, 400);
+  result = await request('/api/profile/avatar', {
+    token: alpha,
+    method: 'POST',
+    body: {
+      avatar: `data:image/png;base64,${Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        Buffer.alloc(300 * 1024),
+      ]).toString('base64')}`,
+    },
+  });
+  assert.equal(result.status, 400);
+  result = await request('/api/profile/avatar', {
+    token: alpha,
+    method: 'POST',
+    body: { avatar: null },
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.avatar, null);
+
+  result = await request('/api/profile/password', {
+    token: alpha,
+    method: 'POST',
+    body: { currentPassword: 'secret12', newPassword: 'changed12' },
+  });
+  assert.equal(result.status, 200);
+  result = await request('/api/login', {
+    method: 'POST',
+    body: { username: 'alpha', password: 'changed12' },
+  });
+  assert.equal(result.status, 200);
+
+  result = await request('/api/export?format=txt', { token: beta, raw: true });
+  assert.match(result.body, /Edited \[b\]:laugh: by beta\[\/b\]/);
+  assert.match(result.body, /Beta entry/);
+  assert.match(result.body, /Shared \[u\]:surprised:\[\/u\]/);
+  assert.match(result.body, /A \[i\]silly ending :silly:\[\/i\] then \[s\]angry :angry:\[\/s\]/);
+  assert.match(result.body, /\[Има прикачена снимка\]/);
+
+  result = await request('/api/export?format=pdf', { token: beta, raw: true });
+  assert.match(result.body, /<use href="\/emoticons\.svg#laugh"><\/use>/);
+  assert.match(result.body, /<use href="\/emoticons\.svg#silly"><\/use>/);
+  assert.match(result.body, /<use href="\/emoticons\.svg#angry"><\/use>/);
+  assert.match(result.body, /<strong><svg class="inline-emoticon"/);
+  assert.match(result.body, /<em>silly ending <svg class="inline-emoticon"/);
+  assert.match(result.body, /<s>angry <svg class="inline-emoticon"/);
+  assert.match(result.body, /<img class="photo" src="data:image\/png;base64,/);
+
+  result = await request(`/api/howlers/${alphaEntryId}`, {
+    token: alpha,
+    method: 'PUT',
+    body: entryBody({
+      title: 'Edited [b]:laugh: by beta[/b]',
+      quote: undefined,
+      story: undefined,
+      content: 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]',
+      photo: '',
+      category: 'mixed',
+      mood: 'hilarious',
+      tags: ['shared'],
+      isFavorite: false,
+      isPublic: true,
+    }),
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.entry.photo, '');
+  assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photo, '');
+
+  result = await request('/api/admin/stats');
+  assert.equal(result.status, 200);
+  assert.equal(result.body.totalUsers, 4);
+  result = await request('/api/admin/users');
+  assert.equal(result.status, 200);
+  const protectedUser = result.body.find(user => user.username === 'koldkat');
+  assert.ok(protectedUser);
+  assert.equal(protectedUser.isProtected, true);
+  result = await request(`/api/admin/users/${protectedUser.id}`, { method: 'DELETE' });
+  assert.equal(result.status, 403);
+  assert.equal(result.body.error, 'Този администратор е защитен и не може да бъде изтрит.');
+  result = await request('/api/admin/entries');
+  assert.equal(result.status, 200);
+  assert.equal(result.body.length, 2);
+  result = await request('/api/admin/entries/999999', { method: 'PATCH' });
+  assert.equal(result.status, 404);
+  assert.equal(result.body.error, 'Записът не е намерен.');
+  result = await request('/api/admin/entries/999999', { method: 'DELETE' });
+  assert.equal(result.status, 404);
+  assert.equal(result.body.error, 'Записът не е намерен.');
+
+  result = await request('/api/logout', { token: gamma, method: 'POST' });
+  assert.equal(result.status, 200);
+  result = await request('/api/me', { token: gamma });
+  assert.equal(result.status, 401);
+
+  assert.equal((await request(`/api/kids/${betaKidId}`, {
+    token: alpha,
+    method: 'DELETE',
+  })).status, 200);
+  result = await request(`/api/howlers/${betaEntryId}`, {
+    token: alpha,
+    method: 'DELETE',
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.state.entries.some(entry => entry.id === betaEntryId), false);
+
+  console.log('Regression suite passed: auth, profiles, password, invites, merge, kids, entries, inline SVG emoticons, feed, export, logout, and admin routes.');
+}
+
+main()
+  .catch(error => {
+    console.error(error.stack || error);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    server.kill('SIGTERM');
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });

@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Howlers Webapp - Technical Documentation</title>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #f8fafc; color: #24324a; }
+    main { max-width: 980px; margin: 0 auto; padding: 32px 20px 56px; line-height: 1.65; }
+    h1, h2, h3, h4 { line-height: 1.25; color: #1f2b40; }
+    h1 { margin-top: 0; }
+    h2 { margin-top: 1.9rem; border-top: 1px solid #ecdcc6; padding-top: 1rem; }
+    h3 { margin-top: 1.25rem; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    code { background: #f6ead8; padding: 0.1rem 0.35rem; border-radius: 6px; }
+    pre { background: #f6ead8; padding: 12px 14px; border-radius: 12px; overflow-x: auto; line-height: 1.45; }
+    ul, ol { padding-left: 1.35rem; }
+    li { margin: 0.28rem 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0.9rem 0; background: rgba(255,255,255,0.42); }
+    th, td { border: 1px solid #ecdcc6; padding: 0.55rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: #f6ead8; }
+    a { color: #1d6fa5; }
+</style>
+</head>
+<body>
+  <main>
+<h1>Howlers Webapp Technical Documentation</h1>
+<h2>Overview</h2>
+<p>Howlers Webapp is a small Node.js + vanilla JS application with a static client and a minimal HTTP server.</p>
+<p>Repository/runtime note:</p>
+<ul>
+<li>the repository is still named <code>Howlers Webapp</code>, but the shipped Bulgarian UI brand shown to end users is <strong>Семейни бисери</strong></li>
+</ul>
+<p>Core stack:</p>
+<ul>
+<li>Node.js built-in <code>http</code>, <code>fs</code>, and <code>path</code></li>
+<li><code>better-sqlite3</code> for persistence</li>
+<li>server-sent events for live client refreshes</li>
+<li>no frontend framework</li>
+</ul>
+<h2>Project Layout</h2>
+<ul>
+<li><code>server.js</code>: HTTP server composition, top-level route matching, and app route handlers</li>
+<li><code>server/auth.js</code>: shared authenticated-session guard</li>
+<li><code>server/config.js</code>: paths, port, request limits, backup policy, MIME map, and protected admin usernames</li>
+<li><code>server/db.js</code>: SQLite schema, auth/session helpers, entry queries, summary queries</li>
+<li><code>server/http.js</code>: JSON response helper, request body parsing, token extraction, and localhost detection</li>
+<li><code>server/static.js</code>: static file serving from <code>public/</code></li>
+<li><code>server/public.js</code>: server-rendered public post pages, dynamic sitemap, and robots output</li>
+<li><code>server/sse.js</code>: server-sent events client registry and publish helpers</li>
+<li><code>server/state.js</code>: authenticated and guest app-state builders</li>
+<li><code>server/image-validation.js</code>: shared raster data URL, decoded-size, and file-signature validation</li>
+<li><code>server/howler-validation.js</code>: entry payload validation and default local date helper</li>
+<li><code>server/export.js</code>: TXT export and print/PDF HTML rendering</li>
+<li><code>server/backup.js</code>: hourly SQLite snapshot ZIP creation and 14-day retention</li>
+<li><code>server/routes/admin.js</code>: localhost-only admin page and admin API handlers</li>
+<li><code>scripts/regression-test.js</code>: isolated end-to-end API regression suite using a temporary SQLite database</li>
+<li><code>public/index.html</code>: app structure and themed confirm dialog markup</li>
+<li><code>public/css/style.css</code>: full visual styling, including custom favorite control and confirm modal</li>
+<li><code>public/js/app.js</code>: main client entry point and feature orchestration for auth, profile, editor, feed rendering, SSE, and event binding</li>
+<li><code>public/js/app/api.js</code>: main-app token helpers and JSON API wrapper</li>
+<li><code>public/js/app/constants.js</code>: main-app slugs, formatting metadata, emoticon tokens, and upload limits</li>
+<li><code>public/js/app/dom.js</code>: main-app DOM lookup and shared backdrop-dismiss behavior</li>
+<li><code>public/js/app/format.js</code>: main-app HTML escaping, date formatting, and data URL size helpers</li>
+<li><code>public/js/i18n.js</code>: lightweight i18n module - locale loading, <code>t()</code> translation helper, and DOM text application</li>
+<li><code>public/locales/bg.json</code>: Bulgarian translation strings</li>
+<li><code>public/admin.html</code>: localhost-only admin panel (not served to external users)</li>
+<li><code>public/css/admin.css</code>: standalone admin panel styles</li>
+<li><code>public/js/admin.js</code>: admin panel entry point and feature orchestration for stats, entries, users, maintenance actions, auto-refresh, and event binding</li>
+<li><code>public/js/admin/core.js</code>: admin formatting helpers, escaping, table cell helpers, and JSON API wrapper</li>
+<li><code>public/js/admin/dialogs.js</code>: admin toast and confirm dialog wiring</li>
+<li><code>scripts/docs-guard.js</code>: checks whether docs were updated when relevant app files changed</li>
+<li><code>scripts/install-hooks.js</code>: installs the repo pre-commit hook when a <code>.git</code> directory exists</li>
+<li><code>.githooks/pre-commit</code>: runs the docs guard before commit</li>
+<li><code>docs/USER_GUIDE.md</code>: end-user documentation</li>
+<li><code>docs/USER_GUIDE.html</code>: HTML version of the end-user documentation</li>
+<li><code>docs/ADMIN.md</code>: admin panel documentation</li>
+<li><code>docs/ADMIN.html</code>: HTML version of the admin panel documentation</li>
+<li><code>docs/TECHNICAL.md</code>: this file</li>
+<li><code>docs/TECHNICAL.html</code>: HTML version of this technical reference</li>
+</ul>
+<h2>Runtime</h2>
+<p>Default port:</p>
+<ul>
+<li><code>3019</code></li>
+</ul>
+<p>Startup:</p>
+<pre><code>npm start</code></pre>
+<p>The app serves static files from <code>public/</code>. Set <code>PORT</code> to override the default listener.</p>
+<p>Automatic backups:</p>
+<ul>
+<li>the server creates a ZIP backup of the SQLite database at each clock-hour boundary; restarting the server does not create an extra backup</li>
+<li>retention is 14 days</li>
+<li>each backup is created as a temporary SQLite snapshot and then compressed to a <code>.zip</code> archive</li>
+<li>every backup run logs the retention check result, including when <code>0</code> expired backups were removed</li>
+<li>a snapshot or ZIP failure is logged without crashing the server; the next clock-hour attempt remains scheduled</li>
+</ul>
+<p>Regression checks run with <code>npm test</code>. The suite sets <code>DATABASE_PATH</code> to a temporary SQLite file and <code>DISABLE_BACKUPS=1</code>, so it does not touch normal data or create backups.</p>
+<p>JSON request bodies are capped at 2 MiB. Oversized bodies return <code>413</code>, and malformed percent-encoded paths return <code>400</code>, rather than being reported as internal server errors.</p>
+<h2>Data Model</h2>
+<h3><code>users</code></h3>
+<ul>
+<li><code>id</code></li>
+<li><code>username</code> unique</li>
+<li><code>password_hash</code></li>
+<li><code>salt</code></li>
+<li><code>locale</code> (default <code>'bg'</code>) - current UI language setting; only Bulgarian is supported right now</li>
+<li><code>display_name</code> - optional human-readable name shown in nav and profile (login username is unchanged)</li>
+<li><code>avatar</code> - optional JPEG, PNG, WebP, or GIF profile picture stored as a base64 data URL (max 300 KiB decoded)</li>
+<li><code>created_at</code></li>
+</ul>
+<h3><code>families</code></h3>
+<ul>
+<li><code>id</code></li>
+<li><code>created_at</code></li>
+</ul>
+<h3><code>family_members</code></h3>
+<ul>
+<li><code>family_id</code></li>
+<li><code>user_id</code> - one row per user; each user belongs to exactly one family archive</li>
+<li><code>created_at</code></li>
+</ul>
+<h3><code>family_invites</code></h3>
+<ul>
+<li><code>id</code></li>
+<li><code>family_id</code> - the family archive the invite points into</li>
+<li><code>inviter_user_id</code></li>
+<li><code>invitee_user_id</code></li>
+<li><code>status</code> - <code>pending</code>, <code>accepted</code>, or <code>cancelled</code></li>
+<li><code>created_at</code></li>
+<li><code>responded_at</code></li>
+</ul>
+<h3><code>sessions</code></h3>
+<ul>
+<li><code>token</code></li>
+<li><code>user_id</code></li>
+<li><code>created_at</code></li>
+</ul>
+<h3><code>howlers</code></h3>
+<ul>
+<li><code>id</code></li>
+<li><code>user_id</code></li>
+<li><code>family_id</code> - shared archive scope; all fellow parents see these entries</li>
+<li><code>child_name</code></li>
+<li><code>title</code></li>
+<li><code>quote</code> - legacy storage column, retained for backward compatibility</li>
+<li><code>story</code> - stores the current combined entry content</li>
+<li><code>photo</code> - optional JPEG, PNG, WebP, or GIF data URL; decoded image payload is limited to 512 KiB</li>
+<li><code>category</code></li>
+<li><code>happened_on</code></li>
+<li><code>age_note</code></li>
+<li><code>mood</code></li>
+<li><code>tags_json</code></li>
+<li><code>is_favorite</code></li>
+<li><code>is_public</code> - when <code>1</code>, entry appears in the public feed at <code>/api/feed</code></li>
+<li><code>created_at</code></li>
+<li><code>updated_at</code></li>
+</ul>
+<p>API entry objects also include derived <code>content</code>, formed by joining non-empty <code>quote</code> and <code>story</code> values with one blank line. This preserves both parts of records created before the editor fields were merged.</p>
+<h3><code>kids</code></h3>
+<ul>
+<li><code>id</code></li>
+<li><code>user_id</code></li>
+<li><code>family_id</code> - shared archive scope</li>
+<li><code>name</code> - display name or nickname (max 60 chars)</li>
+<li><code>dob</code> - date of birth in <code>YYYY-MM-DD</code> format, or empty string</li>
+<li><code>created_at</code></li>
+</ul>
+<h2>Auth Model</h2>
+<p>Authentication is token-based.</p>
+<p>Flow:</p>
+<ol>
+<li>user registers or logs in</li>
+<li>server creates a session token</li>
+<li>client stores it in <code>localStorage</code> under <code>howlers_webapp_token</code></li>
+<li>client sends it as <code>Authorization: Bearer &lt;token&gt;</code></li>
+<li>SSE uses <code>?token=</code> query parameter</li>
+</ol>
+<p>Passwords are hashed with <code>crypto.scrypt</code> plus per-user salts.</p>
+<p>Each account belongs to exactly one family archive through <code>family_members</code>. New users start in their own family. Accepting a fellow-parent invite merges the invitee's existing family archive into the inviter's archive so existing kids and howlers are preserved.</p>
+<h2>API</h2>
+<h3>Auth</h3>
+<ul>
+<li><code>POST /api/register</code></li>
+<li><code>POST /api/login</code></li>
+<li><code>POST /api/logout</code></li>
+<li><code>GET /api/me</code> - returns <code>{ username, displayName, locale, avatar }</code></li>
+<li><code>POST /api/locale</code> - body <code>{ locale }</code>; currently accepts only <code>'bg'</code>, but the endpoint is kept so adding more locales later does not require a larger API refactor</li>
+</ul>
+<h3>Profile</h3>
+<ul>
+<li><code>GET /api/profile</code> - returns <code>{ id, username, displayName, locale, avatar, familyId, familyMembers, incomingInvites, outgoingInvites }</code></li>
+<li><code>PATCH /api/profile</code> - body <code>{ displayName }</code>, updates display name; returns <code>{ ok, displayName, profile }</code></li>
+<li><code>POST /api/profile/password</code> - body <code>{ currentPassword, newPassword }</code>, changes password (scrypt re-hash)</li>
+<li><code>POST /api/profile/avatar</code> - body <code>{ avatar }</code>, stores or clears an allowlisted raster data URL; max 300 KiB decoded; returns <code>{ ok, avatar }</code></li>
+</ul>
+<h3>Family Invites</h3>
+<ul>
+<li><code>POST /api/family/invites</code> - body <code>{ username }</code>, sends a pending invite to an existing user</li>
+<li><code>POST /api/family/invites/:id/accept</code> - accepts an incoming invite and merges archives</li>
+<li><code>DELETE /api/family/invites/:id</code> - cancels an outgoing invite or declines an incoming invite</li>
+</ul>
+<h3>Kids</h3>
+<ul>
+<li><code>GET /api/kids</code> - returns array of <code>{ id, name, dob }</code> for the authenticated user's shared family archive</li>
+<li><code>POST /api/kids</code> - body <code>{ name, dob? }</code>, adds a kid to the shared family list; triggers SSE push; returns <code>{ ok, kid }</code></li>
+<li><code>DELETE /api/kids/:id</code> - removes a kid from the shared family list (does not affect howler entries); triggers SSE push</li>
+</ul>
+<h3>Admin</h3>
+<ul>
+<li><code>GET /admin</code> - localhost only; serves the admin panel HTML (403 from any other origin)</li>
+<li><code>GET /api/admin/stats</code> - localhost only; returns system stats + category/mood breakdowns + memory</li>
+<li><code>GET /api/admin/users</code> - localhost only; returns array of user rows with entry/session counts and <code>isProtected</code> for protected admin accounts</li>
+<li><code>GET /api/admin/entries</code> - localhost only; returns all entries with user info (most recent first, limit 200)</li>
+<li><code>PATCH /api/admin/entries/:id</code> - toggle <code>is_public</code> on an entry; returns <code>{ isPublic }</code>, or 404 if the entry does not exist</li>
+<li><code>DELETE /api/admin/entries/:id</code> - permanently delete a single entry, or return 404 if it does not exist</li>
+<li><code>DELETE /api/admin/users/:id</code> - delete user and all their data (entries, kids, sessions), close that user's live SSE streams, and return 403 for protected admin users <code>slanchoff</code> and <code>koldkat</code></li>
+<li><code>DELETE /api/admin/users/:id/sessions</code> - clear all sessions for a user, send a <code>sessionExpired</code> SSE message to active tabs, and close those streams</li>
+<li><code>POST /api/admin/vacuum</code> - run <code>VACUUM</code> + WAL checkpoint to compact the database</li>
+</ul>
+<h3>App State</h3>
+<ul>
+<li><code>GET /api/state</code></li>
+<li><code>GET /api/events</code></li>
+<li><code>GET /api/feed</code> - unauthenticated; returns all public howlers sorted newest first</li>
+<li><code>GET /posts/:id</code> - server-rendered public landing page for a public entry; private/non-public entries return 404 with <code>noindex</code></li>
+<li><code>GET /sitemap.xml</code> - dynamic sitemap containing <code>/</code> and public entry pages only</li>
+<li><code>GET /robots.txt</code> - allows public pages, disallows <code>/admin</code> and <code>/api/</code>, and points crawlers to the dynamic sitemap</li>
+</ul>
+<h3>Entries</h3>
+<ul>
+<li><code>POST /api/howlers</code> - accepts the entry fields plus optional <code>photo</code> data URL; returns the created entry and refreshed app <code>state</code></li>
+<li><code>PUT /api/howlers/:id</code> - replaces entry fields; send <code>photo: ""</code> to remove the existing photo; returns the updated entry and refreshed app <code>state</code></li>
+<li><code>DELETE /api/howlers/:id</code> - returns refreshed app <code>state</code> without the deleted entry</li>
+</ul>
+<p>All authenticated entry routes are family-scoped. A fellow parent can create, edit, or delete any entry in the shared family archive. For current clients, <code>content</code> is the combined post text and <code>photo</code> is optional. Photo data must use an allowlisted raster data URL and decode to no more than 512 KiB. When a new entry omits <code>happenedOn</code>, the server assigns its current local calendar date. Updates do not apply this default, so editing an intentionally undated legacy entry does not silently change its date.</p>
+<h2>State Shape Returned By <code>/api/state</code></h2>
+<p>Top-level keys:</p>
+<ul>
+<li><code>app</code></li>
+<li><code>viewer</code></li>
+<li><code>profile</code></li>
+<li><code>attention</code></li>
+<li><code>summary</code></li>
+<li><code>entries</code></li>
+<li><code>kids</code></li>
+<li><code>publicFeed</code></li>
+</ul>
+<p><code>viewer</code> includes:</p>
+<ul>
+<li><code>id</code></li>
+<li><code>username</code></li>
+<li><code>displayName</code></li>
+<li><code>locale</code></li>
+<li><code>avatar</code></li>
+<li><code>familyId</code></li>
+</ul>
+<p><code>summary</code> includes:</p>
+<ul>
+<li>total count</li>
+<li>favorite count</li>
+<li>number of kids represented</li>
+<li>category breakdown</li>
+<li>kid breakdown</li>
+<li>recent items</li>
+<li>first and last timestamps</li>
+</ul>
+<p><code>attention</code> includes:</p>
+<ul>
+<li><code>pendingInviteCount</code></li>
+<li><code>pendingInviteSenders</code> (up to two inviter identities for UI copy)</li>
+</ul>
+<p>DB size is only available through the admin panel (<code>/api/admin/stats</code>), not in user-facing state.</p>
+<h2>UI Notes</h2>
+<h3>Layout</h3>
+<p>The app uses a persistent layout visible to all visitors:</p>
+<p>The spacing scale is intentionally compact: panels, feed cards, form grids, and especially modal shells use reduced padding and gaps to keep more content visible while retaining practical button and input targets.</p>
+<ul>
+<li><strong>Sticky nav bar</strong> at the top: app name plus equal-height themed pill controls (Sign In for guests, or <code>New Entry</code>, username chip, and a distinct coral logout button for logged-in users).</li>
+<li>Header copy avoids repeating the family/archive concept across eyebrow, title, and subtitle: eyebrow is <code>Личен дневник</code>, title remains the brand, and subtitle is <code>Реплики, случки и малки легенди</code>.</li>
+<li><strong>Admin panel</strong> uses Bulgarian UI copy. Its nav bar mirrors the main app header structure, warm gradient, three-line brand treatment, dimensions, shadows, pill controls, and compact mobile behavior while retaining admin status badges and maintenance actions.</li>
+<li><strong>Feed column</strong> (left, always visible): scrollable list of entries. For guests this shows public entries only. For logged-in users this shows the shared family archive with a simplified search-only toolbar above; if the family archive has no entries yet, it falls back to the public feed until the family creates one.</li>
+<li><strong>Sidebar</strong> (right): guests see compact promo cards explaining the private archive, optional public posts, photos, search, parent invites, archive export, and the login/register path. Logged-in users instead see Family Snapshot stats (3 full-width stacked stat cards - total, favorites, kids - each with label on left and big number on right, color-coded with left accent border; plus category/kids chips) and the children panel. Sidebars stick below the nav bar at wide screens and stack below the feed on narrow screens.</li>
+<li>Tooltips use app-themed <code>data-tooltip</code> styling in the main and admin UI. Native <code>title</code> attributes are avoided for interactive controls and truncated admin text so browser-default tooltip styling does not leak into the interface.</li>
+<li>Bulgarian count copy selects singular and plural forms independently for entries/stories and children, avoiding slash forms such as <code>дете/деца</code>.</li>
+<li>entry metadata is assembled from non-empty child, date, and age-note values, so undated entries do not render placeholder dates or stray separators</li>
+</ul>
+<p>There is no separate login page. The Sign In / Register form appears as a centred modal overlay, triggered by the "Sign In" nav button. A top-right <code>×</code>, Escape, or an intentional stationary click on the backdrop dismisses it.</p>
+<h3>Public Feed</h3>
+<p>Guests land on the feed immediately without a separate landing screen. Any entry marked as <strong>Public</strong> appears there. For logged-out users, <code>setAuthState(false)</code> hides the authenticated sidebar and shows the guest promo sidebar next to the feed on wide screens. Tags are private archive metadata: <code>listPublicHowlers()</code> replaces them with an empty array, and public cards do not render a tag container. Authenticated family state retains the original tags for search and editing. Public feed titles link to <code>/posts/:id</code>, which is also the URL listed in the sitemap. Public post pages include canonical, description, Open Graph, Twitter summary, and JSON-LD metadata generated from public entry content.</p>
+<h3>Dashboard (removed)</h3>
+<p>The old 12-column grid dashboard (launcher panel, recent activity, summary, spotlight, archive, favorites panels) has been replaced by the feed+sidebar layout described above.</p>
+<h3>Editor Dialog</h3>
+<p>The howler form now lives inside a modal dialog instead of a persistent dashboard panel.</p>
+<p>Behavior:</p>
+<ul>
+<li>the <code>New Entry</code> launcher opens a blank form dialog</li>
+<li>the default view is intentionally simplified for casual users: only the core fields are shown first</li>
+<li>the former quote and story inputs are presented as one <code>content</code> field; API responses derive it by joining non-empty legacy <code>quote</code> and <code>story</code> values with a blank line</li>
+<li>the database columns remain for backward compatibility; current <code>content</code> writes store the complete combined text in <code>story</code> and clear <code>quote</code>, preserving all visible text when an old entry is edited</li>
+<li>the editor accepts one post photo, previews it locally, retains it during edits, and allows explicit replacement or removal</li>
+<li>browser-side processing converts uploads to JPEG, limits the longest edge to 1600 px, and reduces quality/dimensions until the decoded payload is at most 512 KiB</li>
+<li>the server independently allowlists JPEG/PNG/WebP/GIF data URLs, validates their binary signatures, and rejects decoded payloads above 512 KiB</li>
+<li>custom SVG emoticon palettes below the title and combined content field provide 12 hand-drawn expressions and insert any number at the current text caret; they do not use Unicode emoji or platform-default artwork</li>
+<li>inline faces are stored in the existing text fields as allowlisted tokens such as <code>:laugh:</code> and rendered as SVG only after all ordinary text is HTML-escaped</li>
+<li>rendered SVG markup is emitted without surrounding whitespace so fields using <code>white-space: pre-wrap</code> do not introduce line breaks around emotes</li>
+<li>compact formatting toolbars support bold, italic, underline, and strikethrough in the title and combined content field using <code>[b]</code>, <code>[i]</code>, <code>[u]</code>, and <code>[s]</code> markers</li>
+<li>the editor remembers the latest title/content selection, so toolbar clicks wrap the selected text in the correct field even after the button receives pointer input</li>
+<li>the same formatting actions are available from <code>Ctrl/Cmd+B</code>, <code>Ctrl/Cmd+I</code>, <code>Ctrl/Cmd+U</code>, and <code>Ctrl/Cmd+Shift+X</code>, operating on the current selection or caret in new and edit dialogs</li>
+<li>formatting markers are stored as plain text, converted only to fixed allowlisted HTML elements after escaping, retained verbatim in TXT export, and rendered in the printable HTML export</li>
+<li>optional metadata such as date, category, mood, tags, favorite/public flags, and age note live behind an explicit advanced-options toggle</li>
+<li>the advanced section uses the actual <code>hidden</code> attribute now, so it stays collapsed until explicitly opened</li>
+<li>child selection is now a themed in-app select instead of an unstyleable browser datalist</li>
+<li>choosing an existing child with a saved birth date auto-fills the entry age note based on the selected entry date (or today when no date is set)</li>
+<li>clicking <code>Edit</code> on any entry opens the same dialog in edit mode</li>
+<li>save and delete actions close the dialog after a successful request</li>
+<li>the editor and profile use a consistent circular <code>×</code> control in the top-right</li>
+<li>pressing <code>Escape</code> or intentionally clicking the backdrop closes a dialog</li>
+<li>backdrop dismissal requires the pointer press and release to both occur on the backdrop with negligible movement, so dragging a text selection outside the dialog does not close it</li>
+<li>the main app and admin backgrounds keep both the color bands and SVG drawing layers fixed while content scrolls</li>
+</ul>
+<h3>Favorite + Public Controls</h3>
+<p>Both the favorite and public toggles are styled as checkbox cards (see <strong>Favorite Control</strong> below).</p>
+<ul>
+<li><strong>Favorite</strong>: includes the entry in the family favorite count and marks it as a favorite in the archive.</li>
+<li><strong>Public</strong>: makes the entry visible to anyone in the public feed at <code>/api/feed</code>.</li>
+</ul>
+<p>The public/favorite state is edited in the form, but not repeated as extra chips on the feed cards.</p>
+<h3>Profile + Family Archive</h3>
+<p>The profile modal now has a <strong>Family Archive</strong> section.</p>
+<ul>
+<li>profile identity saves return the complete refreshed profile; the client renders from its merged profile object so partial SSE or mutation payloads cannot blank fields such as <code>displayName</code></li>
+</ul>
+<p>Behavior:</p>
+<ul>
+<li>shows every current family member</li>
+<li>lets the user send a username-based invite to another existing account</li>
+<li>pins incoming invites to a highlighted attention section at the very top of the profile modal, with <strong>Accept</strong> / <strong>Decline</strong></li>
+<li>lists outgoing invites with <strong>Cancel invite</strong></li>
+<li>surfaces pending incoming invites outside the profile modal too, via a highlighted archive notice and a count badge on the nav profile button</li>
+<li>accepting an invite merges both archives into one shared family archive</li>
+</ul>
+<p>The avatar uploader in the profile modal uses a small circular <code>+</code> badge anchored to the avatar preview. Hover/focus reveals a themed tooltip; the old full-overlay avatar text is no longer shown.</p>
+<h3>Favorite Control</h3>
+<p>The favorite toggle is intentionally not browser-native in appearance. It is implemented as:</p>
+<ul>
+<li>a real checkbox for semantics</li>
+<li>visually restyled into a themed card control</li>
+<li>custom checked indicator via CSS</li>
+</ul>
+<h3>Confirmation Dialog</h3>
+<p>Deletion uses a custom modal instead of <code>window.confirm()</code>.</p>
+<p>Implementation:</p>
+<ul>
+<li>HTML overlay and dialog in <code>public/index.html</code></li>
+<li>modal styles in <code>public/css/style.css</code></li>
+<li>promise-based confirm helper in <code>public/js/app.js</code></li>
+</ul>
+<h3>Theme</h3>
+<p>The current UI theme is intentionally colorful and playroom-inspired:</p>
+<ul>
+<li>the page background uses the shared full-viewport <code>public/background-scene.svg</code> illustration over three CSS color bands, with small doodles distributed toward both sides so wide displays do not leave the edges empty</li>
+<li>doodles follow the meaning of each band: the blue sky contains the sun, clouds, and several simple flying-bird marks made from uneven paired arcs; the yellow sand contains an unmistakable sandcastle, pail, shovel, and beach ball; the green grass contains a child-drawn house with a diagonally tilted chimney visibly attached to the roof, a tree, flowers, grass tufts, one running stick figure, and another waving while holding a balloon</li>
+<li>the SVG is built from simple one-stroke constructions with uneven outlines, doubled crayon-like marks, mismatched details, imperfect symmetry, and inconsistent proportions; repeated objects are drawn separately rather than cloned so the scene resembles a child's drawing rather than polished icon art</li>
+<li>a low-contrast CSS texture layer sits fixed over the page so the background keeps some depth without continuous animation cost</li>
+<li>the sticky header is translucent on purpose so the top of the doodle scene can visually continue through it instead of being cut off</li>
+<li>panel sections use distinct color families so the dashboard feels more playful and thematic</li>
+<li>preserved layout, spacing, and component structure so this remains a styling-only change</li>
+</ul>
+<h2>Live Update Model</h2>
+<p>The client hydrates once, then opens <code>/api/events</code>.</p>
+<p>Live update behavior:</p>
+<ul>
+<li>authenticated sessions receive the full app state over SSE, including viewer/profile data, family archive state, kids, attention data, and the current public feed</li>
+<li>failed or already-closed SSE responses are removed from the registry so they cannot make an unrelated mutation return a server error</li>
+<li>guest sessions can also subscribe to <code>/api/events</code>; they receive public-feed updates without logging in</li>
+<li>authenticated SSE clients keep their session token attached server-side; if the token is deleted by logout, admin session clearing, or user deletion, the server sends <code>{ sessionExpired: true }</code> and closes the stream</li>
+<li>the client handles <code>sessionExpired</code> by clearing the local token, closing private dialogs, rendering the public feed, reopening guest SSE, and showing the login dialog</li>
+<li>profile modal content can now update live because the SSE payload includes <code>profile</code></li>
+<li>entry create/update/delete and admin public-entry changes fan out through SSE so both the public feed and authenticated public-feed fallback stay current</li>
+<li>the mutating tab renders the refreshed <code>state</code> returned by create/update/delete immediately; SSE remains the cross-tab and cross-user synchronization mechanism rather than the only local refresh path</li>
+<li>transient SSE connection drops are allowed to reconnect quietly; the client no longer turns every short interruption into a visible disconnect warning</li>
+<li>family/profile/kid/invite changes still publish only to affected authenticated users</li>
+</ul>
+<p>CPU-oriented guardrails:</p>
+<ul>
+<li>avoid animating full-screen fixed background layers unless there is a strong reason</li>
+<li>avoid scroll-time blur effects on persistent surfaces like the sticky header</li>
+<li>debounce user-driven re-renders such as live search instead of repainting on every keystroke</li>
+</ul>
+<h2>Validation Rules</h2>
+<p>Server-side validation requires:</p>
+<ul>
+<li><code>childName</code></li>
+<li><code>title</code></li>
+<li>non-empty <code>content</code> for the current client, while legacy <code>quote</code>/<code>story</code> API payloads remain accepted</li>
+<li>a real calendar date in <code>YYYY-MM-DD</code> form if date is present</li>
+<li>bounded lengths for child name, title, and combined content; legacy quote/story payloads retain their previous limits</li>
+<li>category in <code>said | did | mixed | milestone | oops | wisdom | art | bedtime</code></li>
+<li>mood in <code>golden | chaotic | sweet | legendary | hilarious | heartwarming | facepalm | proud | bittersweet</code></li>
+</ul>
+<p>All validation, authentication, invite, image, and general API errors returned to the Bulgarian client use Bulgarian wording. The static HTML also contains Bulgarian fallback copy before the locale bundle finishes loading.</p>
+<h2>Documentation Guard</h2>
+<p>The repo includes a lightweight documentation guard:</p>
+<ul>
+<li><code>npm run docs:check</code> checks staged files in git, or accepts explicit file paths as arguments</li>
+<li>if relevant app files changed under <code>public/</code>, <code>server/</code>, <code>server.js</code>, <code>package.json</code>, or <code>package-lock.json</code>, the guard expects at least one tracked Markdown doc (<code>docs/USER_GUIDE.md</code>, <code>docs/TECHNICAL.md</code>, or <code>docs/ADMIN.md</code>) to be updated in the same change</li>
+<li><code>npm run hooks:install</code> copies <code>.githooks/pre-commit</code> into <code>.git/hooks/pre-commit</code></li>
+<li><code>npm install</code> also triggers the installer through the <code>prepare</code> script when the project is inside a git checkout</li>
+<li>set <code>DOCS_GUARD_BYPASS=1</code> only for changes that are genuinely documentation-neutral</li>
+</ul>
+<p>Documentation conventions:</p>
+<ul>
+<li>meaningful user-visible or maintenance-relevant changes should be reflected in the docs</li>
+<li><code>TECHNICAL.*</code> should stay in English</li>
+<li><code>USER_GUIDE.*</code> should stay concise, Bulgarian, and easy for non-technical users to scan</li>
+<li><code>ADMIN.*</code> should stay Bulgarian and focused on localhost-only maintenance tasks</li>
+</ul>
+<p>This does not replace judgment. The check exists to force a docs review whenever code changes are likely to affect behavior, UI, setup, API, auth/session handling, storage, or maintainability.</p>
+<h2>Static Assets</h2>
+<ul>
+<li><code>public/favicon.svg</code>: browser favicon asset; uses a hand-drawn sun illustration inspired by the app background doodles aligned with the app's playful family archive theme</li>
+<li><code>public/background-scene.svg</code>: shared main/admin background illustration aligned to the blue, yellow, and green color bands</li>
+<li><code>public/emoticons.svg</code>: custom hand-drawn SVG symbol sprite used for inline text emotes in the editor, feed cards, and print export</li>
+<li><code>public/locales/bg.json</code>: Bulgarian UI strings</li>
+</ul>
+<h2>Internationalization</h2>
+<p>The app ships a lightweight i18n layer (<code>public/js/i18n.js</code>) with no external dependencies.</p>
+<p>Key exports:</p>
+<ul>
+<li><code>initI18n(preferredLocale)</code>: loads the given locale (or default if unsupported), applies translations to the static DOM</li>
+<li><code>t(key, vars)</code>: returns the translated string for <code>key</code>; <code>vars</code> is an optional object of <code>{placeholder: value}</code> substitutions</li>
+<li><code>setLocale(lang)</code>: switches locale and re-applies translations to the static DOM (no storage side-effect - the caller decides where to persist)</li>
+<li><code>getLocale()</code>: returns the active locale code</li>
+<li><code>applyI18n()</code>: walks <code>[data-i18n]</code>, <code>[data-i18n-placeholder]</code>, and <code>[data-i18n-tooltip]</code> elements and sets their localized text/placeholder/tooltip data; also sets <code>document.documentElement.lang</code></li>
+</ul>
+<p>Supported locales:</p>
+<ul>
+<li><code>bg</code> - Bulgarian</li>
+</ul>
+<p>Adding a new locale:</p>
+<ol>
+<li>Create <code>public/locales/&lt;code&gt;.json</code> with the same keys as <code>bg.json</code></li>
+<li>Add the code to the <code>SUPPORTED</code> array in <code>i18n.js</code></li>
+<li>Re-enable a UI switcher in <code>app.js</code> and/or the auth/profile flows if you want runtime language switching</li>
+</ol>
+<p>English support has been removed from the shipped UI, but the i18n layer remains in place so additional locales can be added later without refactoring the whole app.</p>
+<h2>Responsive / Mobile</h2>
+<p>Three CSS breakpoints in <code>public/css/style.css</code>:</p>
+<table>
+<thead><tr>
+<th>Breakpoint</th>
+<th>Target</th>
+<th>Key changes</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>≤ 860px</code></td>
+<td>Tablet</td>
+<td>Single-column layout; sidebar unsticks and flows below feed</td>
+</tr>
+<tr>
+<td><code>≤ 600px</code></td>
+<td>Phone</td>
+<td>Base font 14px; nav eyebrow hidden, profile chip collapses to avatar only; toolbar stacks; editor and profile modal become bottom sheets (full-width, rounded top corners); entry card heads stack; config form goes 1-column</td>
+</tr>
+<tr>
+<td><code>≤ 400px</code></td>
+<td>Small phone</td>
+<td>Slightly smaller buttons; confirm dialog actions stack vertically</td>
+</tr>
+</tbody>
+</table>
+<p>Responsive UI is a standing requirement for this app:</p>
+<ul>
+<li>new UI work must remain usable at tablet and phone widths, not just desktop</li>
+<li>no new feature should introduce horizontal overflow for core screens, dialogs, forms, or alerts</li>
+<li>action rows must wrap or stack cleanly for touch use</li>
+<li>profile, auth, editor, kids, and invite flows should stay fully usable on mobile after future changes</li>
+</ul>
+  </main>
+</body>
+</html>

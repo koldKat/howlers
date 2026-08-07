@@ -1,0 +1,16 @@
+{
+  "name": "howlers-webapp",
+  "version": "1.0.0",
+  "description": "Family howlers journal with user accounts and SQLite storage",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node scripts/regression-test.js",
+    "docs:check": "node scripts/docs-guard.js",
+    "hooks:install": "node scripts/install-hooks.js",
+    "prepare": "node scripts/install-hooks.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3"
+  }
+}

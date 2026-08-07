@@ -1,0 +1,16 @@
+node_modules/
+backups/
+.local-node/
+
+database.sqlite
+database.sqlite-*
+
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+
+.DS_Store
+.chmod_test
+.codex_write_test
