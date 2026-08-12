@@ -10,7 +10,8 @@ const { serveFile } = require('./server/static');
 const { createSseHub } = require('./server/sse');
 const { buildState, buildGuestState } = require('./server/state');
 const { handleExport: sendExport } = require('./server/export');
-const { localDateString, validateHowler } = require('./server/howler-validation');
+const { localDateString } = require('./server/date-validation');
+const { validateHowler } = require('./server/howler-validation');
 const { validateRasterImageDataUrl } = require('./server/image-validation');
 const { createAdminHandlers } = require('./server/routes/admin');
 
@@ -29,22 +30,28 @@ const {
 
 async function handleRegister(req, res) {
   const { username, password } = await readBody(req);
-  if (!username?.trim() || !password) {
+  const cleanUsername = typeof username === 'string' ? username.trim() : '';
+  const cleanPassword = typeof password === 'string' ? password : '';
+  if (!cleanUsername || !cleanPassword) {
     send(res, 400, { error: 'Потребителското име и паролата са задължителни.' });
     return;
   }
-  try {
-    const user = await db.createUser(username.trim(), password);
-    const token = db.createSession(user.id);
-    send(res, 200, { token, username: user.username });
-  } catch (error) {
-    send(res, 409, { error: error.message });
+  if (cleanUsername.length > 60) {
+    send(res, 400, { error: 'Потребителското име трябва да е до 60 символа.' });
+    return;
   }
+  if (cleanPassword.length < 6 || cleanPassword.length > 256) {
+    send(res, 400, { error: 'Паролата трябва да е между 6 и 256 символа.' });
+    return;
+  }
+  const user = await db.createUser(cleanUsername, cleanPassword);
+  const token = db.createSession(user.id);
+  send(res, 200, { token, username: user.username });
 }
 
 async function handleLogin(req, res) {
   const { username, password } = await readBody(req);
-  if (!username?.trim() || !password) {
+  if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
     send(res, 400, { error: 'Потребителското име и паролата са задължителни.' });
     return;
   }
@@ -104,6 +111,14 @@ async function handleUpdateProfile(req, res) {
   const session = await authenticate(req, res);
   if (!session) return;
   const { displayName } = await readBody(req);
+  if (displayName !== undefined && displayName !== null && typeof displayName !== 'string') {
+    send(res, 400, { error: 'Показваното име трябва да е текст.' });
+    return;
+  }
+  if (String(displayName || '').trim().length > 60) {
+    send(res, 400, { error: 'Показваното име трябва да е до 60 символа.' });
+    return;
+  }
   const saved = db.updateProfile(session.user_id, { displayName });
   const profile = db.getProfile(session.user_id);
   sseHub.publishToUsers(db.getFamilyUserIds(session.user_id));
@@ -114,12 +129,12 @@ async function handleUpdatePassword(req, res) {
   const session = await authenticate(req, res);
   if (!session) return;
   const { currentPassword, newPassword } = await readBody(req);
-  if (!currentPassword || !newPassword) {
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || !currentPassword || !newPassword) {
     send(res, 400, { error: 'Текущата и новата парола са задължителни.' });
     return;
   }
-  if (String(newPassword).length < 6) {
-    send(res, 400, { error: 'Новата парола трябва да е поне 6 символа.' });
+  if (String(newPassword).length < 6 || String(newPassword).length > 256) {
+    send(res, 400, { error: 'Новата парола трябва да е между 6 и 256 символа.' });
     return;
   }
   try {
@@ -183,6 +198,10 @@ async function handleCreateKid(req, res) {
   const session = await authenticate(req, res);
   if (!session) return;
   const { name, dob } = await readBody(req);
+  if (typeof name !== 'string' || (dob !== undefined && dob !== null && typeof dob !== 'string')) {
+    send(res, 400, { error: 'Името и датата трябва да са текст.' });
+    return;
+  }
   try {
     const kid = db.createKid(session.user_id, { name, dob });
     sseHub.publishToUsers(db.getFamilyUserIds(session.user_id));

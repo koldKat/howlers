@@ -28,9 +28,18 @@ function readBody(req, maxBytes = MAX_REQUEST_BYTES) {
     req.on('end', () => {
       if (tooLarge) return;
       try {
-        resolve(JSON.parse(raw || '{}'));
+        const parsed = JSON.parse(raw || '{}');
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          const error = new Error('JSON данните трябва да са обект.');
+          error.statusCode = 400;
+          reject(error);
+          return;
+        }
+        resolve(parsed);
       } catch {
-        resolve({});
+        const error = new Error('Невалидни JSON данни.');
+        error.statusCode = 400;
+        reject(error);
       }
     });
     req.on('error', reject);

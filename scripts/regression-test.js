@@ -42,14 +42,14 @@ async function waitForServer() {
   throw new Error(`Server did not start:\n${serverOutput}`);
 }
 
-async function request(pathname, { token, method = 'GET', body, raw = false } = {}) {
+async function request(pathname, { token, method = 'GET', body, bodyText, raw = false } = {}) {
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (body !== undefined || bodyText !== undefined) headers['Content-Type'] = 'application/json';
   const response = await fetch(`${baseUrl}${pathname}`, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: bodyText !== undefined ? bodyText : body === undefined ? undefined : JSON.stringify(body),
   });
   return {
     status: response.status,
@@ -106,10 +106,52 @@ async function main() {
   assert.match(result.body, /<symbol id="angry"/);
   assert.match(result.body, /<symbol id="cool"/);
 
+  result = await request('/api/register', {
+    method: 'POST',
+    bodyText: '{"username":',
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Невалидни JSON данни.');
+
+  result = await request('/api/register', {
+    method: 'POST',
+    body: null,
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'JSON данните трябва да са обект.');
+
+  result = await request('/api/register', {
+    method: 'POST',
+    body: { username: 'short-password', password: '12345' },
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Паролата трябва да е между 6 и 256 символа.');
+
+  result = await request('/api/register', {
+    method: 'POST',
+    body: { username: 'x'.repeat(61), password: 'secret12' },
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Потребителското име трябва да е до 60 символа.');
+
+  result = await request('/api/login', {
+    method: 'POST',
+    body: { username: 123, password: 'secret12' },
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Потребителското име и паролата са задължителни.');
+
   const alpha = await register('alpha');
   const beta = await register('beta');
   const gamma = await register('gamma');
   await register('koldkat');
+
+  result = await request('/api/register', {
+    method: 'POST',
+    body: { username: 'alpha', password: 'secret12' },
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.error, 'Потребителското име вече е заето.');
 
   result = await request('/api/profile', {
     token: alpha,
@@ -118,6 +160,14 @@ async function main() {
   });
   assert.equal(result.status, 413);
   assert.equal(result.body.error, 'Заявката е прекалено голяма.');
+
+  result = await request('/api/profile', {
+    token: alpha,
+    method: 'PATCH',
+    body: { displayName: 'x'.repeat(61) },
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Показваното име трябва да е до 60 символа.');
 
   result = await request('/api/howlers', {
     token: alpha,
@@ -218,6 +268,22 @@ async function main() {
   });
   assert.equal(result.status, 200);
   const betaKidId = result.body.kid.id;
+
+  result = await request('/api/kids', {
+    token: beta,
+    method: 'POST',
+    body: { name: 'Impossible birthday', dob: '2021-02-30' },
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Въведи валидна дата на раждане във формат ГГГГ-ММ-ДД.');
+
+  result = await request('/api/kids', {
+    token: beta,
+    method: 'POST',
+    body: { name: 'x'.repeat(61), dob: '' },
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Името трябва да е до 60 символа.');
 
   result = await request('/api/howlers', {
     token: beta,
@@ -420,6 +486,13 @@ async function main() {
     body: { currentPassword: 'secret12', newPassword: 'changed12' },
   });
   assert.equal(result.status, 200);
+  result = await request('/api/profile/password', {
+    token: alpha,
+    method: 'POST',
+    body: { currentPassword: 'changed12', newPassword: 'x'.repeat(257) },
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Новата парола трябва да е между 6 и 256 символа.');
   result = await request('/api/login', {
     method: 'POST',
     body: { username: 'alpha', password: 'changed12' },

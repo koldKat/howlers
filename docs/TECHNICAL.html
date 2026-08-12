@@ -58,6 +58,7 @@ npm start</code></pre>
 <li><code>server.js</code>: listener, top-level route table, and application handlers</li>
 <li><code>server/config.js</code>: paths, limits, backup policy, MIME types, and protected usernames</li>
 <li><code>server/http.js</code>: JSON responses, bounded request parsing, token extraction, and localhost detection</li>
+<li><code>server/date-validation.js</code>: shared local date formatting and real calendar date validation</li>
 <li><code>server/auth.js</code>: authenticated session guard</li>
 <li><code>server/db.js</code>: schema setup, migrations, queries, transactions, and backup snapshot creation</li>
 <li><code>server/state.js</code>: authenticated and guest state builders</li>
@@ -92,8 +93,9 @@ npm start</code></pre>
 <li><code>docs/*.html</code>: generated standalone equivalents</li>
 </ul>
 <h2>Request flow</h2>
-<p>The top-level server parses the URL, matches explicit API and SEO routes, and falls back to static GET handling. JSON request bodies are limited to 2 MiB. Oversized requests return <code>413</code>; malformed encoded paths return <code>400</code>.</p>
+<p>The top-level server parses the URL, matches explicit API and SEO routes, and falls back to static GET handling. JSON request bodies are limited to 2 MiB and must contain an object. Oversized requests, malformed JSON, non-object JSON, and malformed encoded paths return <code>400</code> or <code>413</code> as appropriate.</p>
 <p>API responses use JSON unless the route explicitly returns HTML, XML, plain text, an export, or an SSE stream. Unmatched non-GET routes return <code>404</code>.</p>
+<p>New usernames are trimmed and limited to 60 characters. Registration and password changes require passwords from 6 through 256 characters. Login remains compatible with existing credentials created before these limits were enforced.</p>
 <p>Static serving resolves paths below <code>public/</code> and rejects traversal outside that root.</p>
 <h2>Database and migrations</h2>
 <p>The database enables WAL mode and foreign keys at startup. Schema creation is idempotent. Older databases are upgraded with <code>addColumnIfMissing()</code> calls and a family bootstrap transaction.</p>
@@ -265,9 +267,9 @@ npm run docs:build
 npm run docs:html-check
 npm run docs:check
 npm run hooks:install</code></pre>
-<p><code>npm test</code> starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers auth, profiles, passwords, avatars, invites, family merge, children, entries, formatting tokens, photos, public feed, SEO routes, export, logout, and admin routes.</p>
+<p><code>npm test</code> starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, auth limits, profiles, passwords, avatars, invites, family merge, children and calendar dates, entries, formatting tokens, photos, public feed, SEO routes, export, logout, and admin routes.</p>
 <p><code>docs/*.md</code> files are the source of truth. <code>npm run docs:build</code> regenerates standalone HTML equivalents, while <code>npm run docs:html-check</code> fails if generated HTML is stale.</p>
-<p><code>npm run docs:check</code> examines staged application changes, requires a staged Markdown documentation update when behavior, API, storage, setup, or maintainability changed, and verifies that all generated HTML files match their Markdown sources. <code>DOCS_GUARD_BYPASS=1</code> skips only the relevance check and still checks HTML synchronization.</p>
+<p><code>npm run docs:check</code> examines staged application changes, including deletions, requires a staged Markdown documentation update when behavior, API, storage, setup, or maintainability changed, and verifies that all generated HTML files match their Markdown sources. A Git inspection error fails the check. <code>DOCS_GUARD_BYPASS=1</code> skips only the relevance check and still checks HTML synchronization.</p>
   </main>
 </body>
 </html>

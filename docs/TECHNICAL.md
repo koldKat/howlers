@@ -45,6 +45,7 @@ Server composition:
 - `server.js`: listener, top-level route table, and application handlers
 - `server/config.js`: paths, limits, backup policy, MIME types, and protected usernames
 - `server/http.js`: JSON responses, bounded request parsing, token extraction, and localhost detection
+- `server/date-validation.js`: shared local date formatting and real calendar date validation
 - `server/auth.js`: authenticated session guard
 - `server/db.js`: schema setup, migrations, queries, transactions, and backup snapshot creation
 - `server/state.js`: authenticated and guest state builders
@@ -80,9 +81,11 @@ Documentation and verification:
 
 ## Request flow
 
-The top-level server parses the URL, matches explicit API and SEO routes, and falls back to static GET handling. JSON request bodies are limited to 2 MiB. Oversized requests return `413`; malformed encoded paths return `400`.
+The top-level server parses the URL, matches explicit API and SEO routes, and falls back to static GET handling. JSON request bodies are limited to 2 MiB and must contain an object. Oversized requests, malformed JSON, non-object JSON, and malformed encoded paths return `400` or `413` as appropriate.
 
 API responses use JSON unless the route explicitly returns HTML, XML, plain text, an export, or an SSE stream. Unmatched non-GET routes return `404`.
+
+New usernames are trimmed and limited to 60 characters. Registration and password changes require passwords from 6 through 256 characters. Login remains compatible with existing credentials created before these limits were enforced.
 
 Static serving resolves paths below `public/` and rejects traversal outside that root.
 
@@ -304,8 +307,8 @@ npm run docs:check
 npm run hooks:install
 ```
 
-`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers auth, profiles, passwords, avatars, invites, family merge, children, entries, formatting tokens, photos, public feed, SEO routes, export, logout, and admin routes.
+`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, auth limits, profiles, passwords, avatars, invites, family merge, children and calendar dates, entries, formatting tokens, photos, public feed, SEO routes, export, logout, and admin routes.
 
 `docs/*.md` files are the source of truth. `npm run docs:build` regenerates standalone HTML equivalents, while `npm run docs:html-check` fails if generated HTML is stale.
 
-`npm run docs:check` examines staged application changes, requires a staged Markdown documentation update when behavior, API, storage, setup, or maintainability changed, and verifies that all generated HTML files match their Markdown sources. `DOCS_GUARD_BYPASS=1` skips only the relevance check and still checks HTML synchronization.
+`npm run docs:check` examines staged application changes, including deletions, requires a staged Markdown documentation update when behavior, API, storage, setup, or maintainability changed, and verifies that all generated HTML files match their Markdown sources. A Git inspection error fails the check. `DOCS_GUARD_BYPASS=1` skips only the relevance check and still checks HTML synchronization.

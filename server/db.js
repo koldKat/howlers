@@ -2,6 +2,7 @@ const path = require('path');
 const crypto = require('crypto');
 const util = require('util');
 const Database = require('better-sqlite3');
+const { isValidLocalDate } = require('./date-validation');
 
 const scrypt = util.promisify(crypto.scrypt);
 const databasePath = process.env.DATABASE_PATH
@@ -315,7 +316,11 @@ async function createUser(username, password) {
     createFamilyForUser(result.lastInsertRowid);
     return { id: result.lastInsertRowid, username };
   } catch (error) {
-    if (String(error.message).includes('UNIQUE')) throw new Error('Потребителското име вече е заето.');
+    if (String(error.message).includes('UNIQUE')) {
+      const conflict = new Error('Потребителското име вече е заето.');
+      conflict.statusCode = 409;
+      throw conflict;
+    }
     throw error;
   }
 }
@@ -554,9 +559,13 @@ function listKids(userId) {
 
 function createKid(userId, { name, dob }) {
   const familyId = getFamilyIdForUser(userId);
-  const cleanName = String(name || '').trim().slice(0, 60);
+  const cleanName = String(name || '').trim();
   if (!cleanName) throw new Error('Името е задължително.');
-  const cleanDob = /^\d{4}-\d{2}-\d{2}$/.test(dob || '') ? dob : '';
+  if (cleanName.length > 60) throw new Error('Името трябва да е до 60 символа.');
+  const cleanDob = String(dob || '').trim();
+  if (cleanDob && !isValidLocalDate(cleanDob)) {
+    throw new Error('Въведи валидна дата на раждане във формат ГГГГ-ММ-ДД.');
+  }
   const result = db.prepare(
     'INSERT INTO kids (user_id, family_id, name, dob) VALUES (?, ?, ?, ?)'
   ).run(userId, familyId, cleanName, cleanDob);

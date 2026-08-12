@@ -63,7 +63,7 @@ function collectChangedFiles() {
     return { source: 'nogit', files: [] };
   }
 
-  const diff = runGit(['diff', '--cached', '--name-only', '--diff-filter=ACMR']);
+  const diff = runGit(['diff', '--cached', '--name-only', '--diff-filter=ACMRD']);
   if (!diff.ok) {
     return { source: 'git-error', files: [], reason: diff.reason };
   }
@@ -90,7 +90,7 @@ if (changed.source === 'nogit') {
 
 if (changed.source === 'git-error') {
   print(`[docs-guard] Unable to read staged files: ${changed.reason}`);
-  process.exit(0);
+  process.exit(1);
 }
 
 if (!changed.files.length) {
