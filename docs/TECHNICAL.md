@@ -61,6 +61,7 @@ Server composition:
 Browser code:
 
 - `public/index.html`: main app and modal structure
+- `public/site.webmanifest`, `public/favicon.svg`, and `public/icons/`: install metadata and app icon assets
 - `public/js/app.js`: UI orchestration, rendering, editor, profile, uploads, and SSE lifecycle
 - `public/js/app/api.js`: token storage and JSON API wrapper
 - `public/js/app/constants.js`: categories, moods, emoticons, formatting, and client upload limits
@@ -88,6 +89,8 @@ API responses use JSON unless the route explicitly returns HTML, XML, plain text
 New usernames are trimmed and limited to 60 characters. Registration and password changes require passwords from 6 through 256 characters. Login remains compatible with existing credentials created before these limits were enforced.
 
 Static serving resolves paths below `public/` and rejects traversal outside that root.
+
+The install manifest exposes opaque 192 px and 512 px PNG icons with `purpose: any`. The separate 180 px Apple touch icon and SVG favicon use the same sun artwork on a solid `#111111` background. The manifest also uses that color for its theme and launch background. PNG and web manifest files have explicit response MIME types.
 
 ## Database and migrations
 

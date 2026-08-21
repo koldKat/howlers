@@ -65,6 +65,9 @@ function renderPublicEntryHtml(req, entry) {
   <meta name="twitter:card" content="summary">
   <link rel="canonical" href="${escHtml(canonical)}">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#111111">
   <link rel="stylesheet" href="/css/style.css">
   <script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>
 </head>

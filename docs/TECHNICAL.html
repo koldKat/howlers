@@ -74,6 +74,7 @@ npm start</code></pre>
 <p>Browser code:</p>
 <ul>
 <li><code>public/index.html</code>: main app and modal structure</li>
+<li><code>public/site.webmanifest</code>, <code>public/favicon.svg</code>, and <code>public/icons/</code>: install metadata and app icon assets</li>
 <li><code>public/js/app.js</code>: UI orchestration, rendering, editor, profile, uploads, and SSE lifecycle</li>
 <li><code>public/js/app/api.js</code>: token storage and JSON API wrapper</li>
 <li><code>public/js/app/constants.js</code>: categories, moods, emoticons, formatting, and client upload limits</li>
@@ -97,6 +98,7 @@ npm start</code></pre>
 <p>API responses use JSON unless the route explicitly returns HTML, XML, plain text, an export, or an SSE stream. Unmatched non-GET routes return <code>404</code>.</p>
 <p>New usernames are trimmed and limited to 60 characters. Registration and password changes require passwords from 6 through 256 characters. Login remains compatible with existing credentials created before these limits were enforced.</p>
 <p>Static serving resolves paths below <code>public/</code> and rejects traversal outside that root.</p>
+<p>The install manifest exposes opaque 192 px and 512 px PNG icons with <code>purpose: any</code>. The separate 180 px Apple touch icon and SVG favicon use the same sun artwork on a solid <code>#111111</code> background. The manifest also uses that color for its theme and launch background. PNG and web manifest files have explicit response MIME types.</p>
 <h2>Database and migrations</h2>
 <p>The database enables WAL mode and foreign keys at startup. Schema creation is idempotent. Older databases are upgraded with <code>addColumnIfMissing()</code> calls and a family bootstrap transaction.</p>
 <h3><code>users</code></h3>

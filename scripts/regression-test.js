@@ -106,6 +106,27 @@ async function main() {
   assert.match(result.body, /<symbol id="angry"/);
   assert.match(result.body, /<symbol id="cool"/);
 
+  const manifestResponse = await fetch(`${baseUrl}/site.webmanifest`);
+  assert.equal(manifestResponse.status, 200);
+  assert.match(manifestResponse.headers.get('content-type') || '', /^application\/manifest\+json/);
+  const manifest = await manifestResponse.json();
+  assert.equal(manifest.display, 'standalone');
+  assert.equal(manifest.background_color, '#111111');
+  assert.equal(manifest.theme_color, '#111111');
+  assert.deepEqual(manifest.icons.map(icon => icon.purpose), ['any', 'any']);
+
+  const iconResponse = await fetch(`${baseUrl}/icons/app-icon-192.png`);
+  assert.equal(iconResponse.status, 200);
+  assert.equal(iconResponse.headers.get('content-type'), 'image/png');
+  const iconBytes = Buffer.from(await iconResponse.arrayBuffer());
+  assert.deepEqual([...iconBytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(iconBytes.readUInt8(25), 2);
+
+  result = await request('/', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /<link rel="manifest" href="\/site\.webmanifest">/);
+  assert.match(result.body, /<link rel="apple-touch-icon" sizes="180x180" href="\/icons\/apple-touch-icon\.png">/);
+
   result = await request('/api/register', {
     method: 'POST',
     bodyText: '{"username":',
