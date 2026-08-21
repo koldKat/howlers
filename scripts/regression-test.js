@@ -113,9 +113,9 @@ async function main() {
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.background_color, '#111111');
   assert.equal(manifest.theme_color, '#111111');
-  assert.deepEqual(manifest.icons.map(icon => icon.purpose), ['any', 'any']);
+  assert.deepEqual(manifest.icons.map(icon => icon.purpose), ['any', 'any maskable', 'any maskable']);
 
-  const iconResponse = await fetch(`${baseUrl}/icons/app-icon-192.png`);
+  const iconResponse = await fetch(`${baseUrl}/icons/app-icon-maskable-192.png`);
   assert.equal(iconResponse.status, 200);
   assert.equal(iconResponse.headers.get('content-type'), 'image/png');
   const iconBytes = Buffer.from(await iconResponse.arrayBuffer());

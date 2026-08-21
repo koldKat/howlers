@@ -90,7 +90,7 @@ New usernames are trimmed and limited to 60 characters. Registration and passwor
 
 Static serving resolves paths below `public/` and rejects traversal outside that root.
 
-The install manifest exposes opaque 192 px and 512 px PNG icons with `purpose: any`. The separate 180 px Apple touch icon and SVG favicon use the same sun artwork on a solid `#111111` background. The manifest also uses that color for its theme and launch background. PNG and web manifest files have explicit response MIME types.
+The install manifest exposes the SVG favicon with `purpose: any` and opaque 192 px and 512 px PNG icons with `purpose: any maskable`. The maskable declaration lets adaptive Android launchers clip the black canvas directly instead of placing it inside a white fallback circle. New maskable filenames prevent reuse of older cached icon files. The separate 180 px Apple touch icon uses the same sun artwork on a solid `#111111` background. The manifest also uses that color for its theme and launch background. PNG and web manifest files have explicit response MIME types.
 
 ## Database and migrations
 
