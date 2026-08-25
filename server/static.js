@@ -2,9 +2,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { MIME, ROOT } = require('./config');
 
-function serveFile(res, pathname) {
+function serveFile(req, res, pathname) {
   const cleanPath = pathname === '/' ? '/index.html' : pathname;
   const filePath = path.resolve(ROOT, cleanPath.replace(/^\/+/, ''));
   if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) {
@@ -18,7 +19,18 @@ function serveFile(res, pathname) {
       res.end('Файлът не е намерен');
       return;
     }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream' });
+    const etag = `"${data.length}-${crypto.createHash('md5').update(data).digest('hex').slice(0, 8)}"`;
+    const headers = {
+      'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream',
+      'Cache-Control': 'no-cache',
+      'ETag': etag,
+    };
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, headers);
+      res.end();
+      return;
+    }
+    res.writeHead(200, { ...headers, 'Content-Length': data.length });
     res.end(data);
   });
 }

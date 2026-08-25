@@ -18,7 +18,7 @@ function createAdminHandlers({ sseHub }) {
       res.end('Забранен достъп: администрацията е достъпна само от localhost');
       return;
     }
-    serveFile(res, '/admin.html');
+    serveFile(req, res, '/admin.html');
   }
 
   function handleAdminStats(req, res) {

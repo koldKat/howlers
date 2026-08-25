@@ -34,6 +34,7 @@
 <li>no frontend framework or build step</li>
 <li>Bulgarian UI strings loaded through a lightweight i18n module</li>
 </ul>
+<p>Maintained browser assets use clean, unversioned URLs. The static server sends <code>Cache-Control: no-cache</code> and a content ETag, so each load revalidates the file, unchanged files return <code>304 Not Modified</code>, and deployments do not require a manual <code>?v=N</code> cache-busting cascade.</p>
 <h2>Requirements and startup</h2>
 <p>Runtime requirements:</p>
 <ul>

@@ -354,7 +354,7 @@ const server = http.createServer(async (req, res) => {
         send(res, 400, { error: 'Невалиден адрес.' });
         return;
       }
-      return void serveFile(res, pathname);
+      return void serveFile(req, res, pathname);
     }
     send(res, 404, { error: 'Страницата не е намерена.' });
   } catch (error) {

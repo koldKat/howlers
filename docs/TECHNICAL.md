@@ -13,6 +13,8 @@ The application is intentionally small and self-contained:
 - no frontend framework or build step
 - Bulgarian UI strings loaded through a lightweight i18n module
 
+Maintained browser assets use clean, unversioned URLs. The static server sends `Cache-Control: no-cache` and a content ETag, so each load revalidates the file, unchanged files return `304 Not Modified`, and deployments do not require a manual `?v=N` cache-busting cascade.
+
 ## Requirements and startup
 
 Runtime requirements:

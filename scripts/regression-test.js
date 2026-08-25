@@ -106,6 +106,18 @@ async function main() {
   assert.match(result.body, /<symbol id="angry"/);
   assert.match(result.body, /<symbol id="cool"/);
 
+  const staticResponse = await fetch(`${baseUrl}/js/app.js`);
+  assert.equal(staticResponse.status, 200);
+  assert.equal(staticResponse.headers.get('cache-control'), 'no-cache');
+  const staticEtag = staticResponse.headers.get('etag');
+  assert.ok(staticEtag);
+  await staticResponse.arrayBuffer();
+  const revalidatedStatic = await fetch(`${baseUrl}/js/app.js`, {
+    headers: { 'If-None-Match': staticEtag },
+  });
+  assert.equal(revalidatedStatic.status, 304);
+  assert.equal(revalidatedStatic.headers.get('cache-control'), 'no-cache');
+
   const manifestResponse = await fetch(`${baseUrl}/site.webmanifest`);
   assert.equal(manifestResponse.status, 200);
   assert.match(manifestResponse.headers.get('content-type') || '', /^application\/manifest\+json/);
