@@ -10,9 +10,11 @@ import {
 } from './app/constants.js';
 import { apiFetch, clearToken, getToken, setToken } from './app/api.js';
 import { bindBackdropDismiss, getAppElements } from './app/dom.js';
+import { createFeedLoader } from './app/feed-loading.js';
 import { dataUrlBytes, escapeHtml, formatDate } from './app/format.js';
 
 const els = getAppElements();
+const feedLoader = createFeedLoader(els.feedList);
 
 let viewer = null;
 let currentProfile = null;
@@ -972,6 +974,7 @@ async function fetchPublicFeedEntries() {
 }
 
 async function loadPublicFeed() {
+  feedLoader.show(t('feed_loading'));
   renderPublicFeed(await fetchPublicFeedEntries());
 }
 

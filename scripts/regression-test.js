@@ -126,6 +126,19 @@ async function main() {
   assert.equal(result.status, 200);
   assert.match(result.body, /<link rel="manifest" href="\/site\.webmanifest">/);
   assert.match(result.body, /<link rel="apple-touch-icon" sizes="180x180" href="\/icons\/apple-touch-icon\.png">/);
+  assert.match(result.body, /class="feed-loading" role="status" aria-live="polite"/);
+  assert.equal((result.body.match(/class="feed-loading-spoke feed-loading-spoke-\d"/g) || []).length, 4);
+  assert.match(result.body, /feed-loading-spoke-1[^>]*><path d="M32 7\.5v9" \/><path d="M32 47\.5v9"/);
+
+  result = await request('/js/app/feed-loading.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /export function createFeedLoader/);
+  assert.match(result.body, /container\.replaceChildren\(loader\)/);
+
+  result = await request('/css/style.css', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /@keyframes feed-sun-spokes/);
+  assert.match(result.body, /prefers-reduced-motion: reduce/);
 
   result = await request('/api/register', {
     method: 'POST',

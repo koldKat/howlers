@@ -79,6 +79,7 @@ npm start</code></pre>
 <li><code>public/js/app/api.js</code>: token storage and JSON API wrapper</li>
 <li><code>public/js/app/constants.js</code>: categories, moods, emoticons, formatting, and client upload limits</li>
 <li><code>public/js/app/dom.js</code>: DOM references and backdrop dismissal</li>
+<li><code>public/js/app/feed-loading.js</code>: reusable feed-loader cloning and localized status updates</li>
 <li><code>public/js/app/format.js</code>: escaping, dates, and data URL sizing</li>
 <li><code>public/js/i18n.js</code>: locale loading and DOM translation</li>
 <li><code>public/locales/bg.json</code>: Bulgarian strings</li>
@@ -99,6 +100,7 @@ npm start</code></pre>
 <p>New usernames are trimmed and limited to 60 characters. Registration and password changes require passwords from 6 through 256 characters. Login remains compatible with existing credentials created before these limits were enforced.</p>
 <p>Static serving resolves paths below <code>public/</code> and rejects traversal outside that root.</p>
 <p>The install manifest exposes the SVG favicon with <code>purpose: any</code> and opaque 192 px and 512 px PNG icons with <code>purpose: any maskable</code>. The maskable declaration lets adaptive Android launchers clip the black canvas directly instead of placing it inside a white fallback circle. New maskable filenames prevent reuse of older cached icon files. The separate 180 px Apple touch icon uses the same sun artwork on a solid <code>#111111</code> background. The manifest also uses that color for its theme and launch background. PNG and web manifest files have explicit response MIME types.</p>
+<p>The feed starts with a functional loading state whose sun matches <code>public/favicon.svg</code>. Its eight rays are grouped into four opposite pairs and animated only through opacity, so each pair appears and disappears together. <code>public/js/app/feed-loading.js</code> retains the initial semantic loader as a template and restores it before public-feed transitions; this clears authenticated cards immediately during logout or session expiry instead of leaving private content visible while <code>/api/feed</code> is pending. Successful public or authenticated rendering replaces the loader directly. <code>prefers-reduced-motion: reduce</code> disables the ray animation and leaves all pairs visible.</p>
 <h2>Database and migrations</h2>
 <p>The database enables WAL mode and foreign keys at startup. Schema creation is idempotent. Older databases are upgraded with <code>addColumnIfMissing()</code> calls and a family bootstrap transaction.</p>
 <h3><code>users</code></h3>

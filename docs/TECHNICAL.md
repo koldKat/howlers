@@ -66,6 +66,7 @@ Browser code:
 - `public/js/app/api.js`: token storage and JSON API wrapper
 - `public/js/app/constants.js`: categories, moods, emoticons, formatting, and client upload limits
 - `public/js/app/dom.js`: DOM references and backdrop dismissal
+- `public/js/app/feed-loading.js`: reusable feed-loader cloning and localized status updates
 - `public/js/app/format.js`: escaping, dates, and data URL sizing
 - `public/js/i18n.js`: locale loading and DOM translation
 - `public/locales/bg.json`: Bulgarian strings
@@ -91,6 +92,8 @@ New usernames are trimmed and limited to 60 characters. Registration and passwor
 Static serving resolves paths below `public/` and rejects traversal outside that root.
 
 The install manifest exposes the SVG favicon with `purpose: any` and opaque 192 px and 512 px PNG icons with `purpose: any maskable`. The maskable declaration lets adaptive Android launchers clip the black canvas directly instead of placing it inside a white fallback circle. New maskable filenames prevent reuse of older cached icon files. The separate 180 px Apple touch icon uses the same sun artwork on a solid `#111111` background. The manifest also uses that color for its theme and launch background. PNG and web manifest files have explicit response MIME types.
+
+The feed starts with a functional loading state whose sun matches `public/favicon.svg`. Its eight rays are grouped into four opposite pairs and animated only through opacity, so each pair appears and disappears together. `public/js/app/feed-loading.js` retains the initial semantic loader as a template and restores it before public-feed transitions; this clears authenticated cards immediately during logout or session expiry instead of leaving private content visible while `/api/feed` is pending. Successful public or authenticated rendering replaces the loader directly. `prefers-reduced-motion: reduce` disables the ray animation and leaves all pairs visible.
 
 ## Database and migrations
 
