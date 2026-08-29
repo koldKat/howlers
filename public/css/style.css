@@ -591,12 +591,46 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   line-height: 1.45;
 }
 .config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
-.config-grid label { display: flex; flex-direction: column; gap: 0.28rem; }
-.config-grid label span { font-size: 0.82rem; color: var(--muted); }
+.config-grid label, .config-grid .field-group { display: flex; flex-direction: column; gap: 0.28rem; }
+.config-grid label span, .config-grid .field-group > span { font-size: 0.82rem; color: var(--muted); }
 .config-grid .wide { grid-column: 1 / -1; }
 .child-picker-stack {
   display: grid;
   gap: 0.38rem;
+}
+.child-multi-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+  min-height: 38px;
+  padding: 0.38rem;
+  border: 1px solid rgba(68, 102, 164, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 253, 247, 0.98);
+}
+.child-choice {
+  position: relative;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.34rem !important;
+  padding: 0.34rem 0.56rem;
+  border: 1px solid rgba(68, 102, 164, 0.16);
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+.child-choice input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--teal);
+}
+.child-choice span { color: var(--text) !important; }
+.child-picker-empty {
+  align-self: center;
+  padding: 0.12rem 0.2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 .field-hint {
   color: var(--muted);

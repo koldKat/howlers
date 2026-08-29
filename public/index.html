@@ -226,17 +226,15 @@
       <p id="editor-intro" class="editor-intro" data-i18n="editor_intro">Запиши само най-важното. Останалото е по желание.</p>
       <form class="config-grid">
         <input type="hidden" id="entry-id">
-        <label>
-          <span data-i18n="form_label_child">Дете</span>
+        <div class="field-group">
+          <span data-i18n="form_label_child">Деца</span>
           <div class="child-picker-stack">
-            <select id="child-select">
-              <option value="" data-i18n="child_select_placeholder">Избери добавено дете</option>
-            </select>
-            <input type="text" id="child-name" data-i18n-placeholder="placeholder_child" placeholder="Мила" autocomplete="off">
+            <div id="child-select" class="child-multi-picker" role="group" aria-label="Избери едно или повече деца"></div>
+            <input type="text" id="child-name" data-i18n-placeholder="placeholder_child" placeholder="Друго име или имена" autocomplete="off">
           </div>
-          <small class="field-hint" data-i18n="child_picker_hint">Избери от добавените деца или въведи ново име.</small>
+          <small class="field-hint" data-i18n="child_picker_hint">Избери едно или повече деца. Други имена се разделят със запетая.</small>
           <small id="child-age-preview" class="field-hint child-age-preview" hidden></small>
-        </label>
+        </div>
         <label class="wide">
           <span data-i18n="form_label_title">Заглавие</span>
           <input type="text" id="title" data-i18n-placeholder="placeholder_title" placeholder="Луната ни следва до вкъщи">

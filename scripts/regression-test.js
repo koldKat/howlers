@@ -118,6 +118,20 @@ async function main() {
   assert.equal(revalidatedStatic.status, 304);
   assert.equal(revalidatedStatic.headers.get('cache-control'), 'no-cache');
 
+  result = await request('/js/app.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /createFeedController/);
+  assert.match(result.body, /kidsController\.render\(\[\]\)/);
+  assert.doesNotMatch(result.body, /latestKids/);
+
+  result = await request('/js/app/feed.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /export function createFeedController/);
+
+  result = await request('/js/app/kids.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /export function createKidsController/);
+
   const manifestResponse = await fetch(`${baseUrl}/site.webmanifest`);
   assert.equal(manifestResponse.status, 200);
   assert.match(manifestResponse.headers.get('content-type') || '', /^application\/manifest\+json/);
@@ -221,7 +235,15 @@ async function main() {
     body: entryBody({ childName: '' }),
   });
   assert.equal(result.status, 400);
-  assert.equal(result.body.error, 'Името на детето е задължително.');
+  assert.equal(result.body.error, 'Избери поне едно дете.');
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({ childNames: ['Mila', { name: 'Niki' }] }),
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Имената на децата трябва да са текст.');
 
   result = await request('/api/howlers', {
     token: alpha,
@@ -429,6 +451,7 @@ async function main() {
     token: beta,
     method: 'PUT',
     body: entryBody({
+      childNames: ['Mila', 'Niki', 'mila'],
       title: 'Edited [b]:laugh: by beta[/b]',
       quote: undefined,
       story: undefined,
@@ -443,17 +466,25 @@ async function main() {
   });
   assert.equal(result.status, 200);
   assert.equal(result.body.entry.title, 'Edited [b]:laugh: by beta[/b]');
+  assert.deepEqual(result.body.entry.childNames, ['Mila', 'Niki']);
+  assert.equal(result.body.entry.childName, 'Mila, Niki');
   assert.equal(result.body.entry.quote, '');
   assert.equal(result.body.entry.story, 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]');
   assert.equal(result.body.entry.content, 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]');
   assert.equal(result.body.entry.photo, TINY_PNG);
   assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photo, TINY_PNG);
+  assert.deepEqual(result.body.state.entries.find(entry => entry.id === alphaEntryId).childNames, ['Mila', 'Niki']);
+  assert.deepEqual(result.body.state.summary.kidsBreakdown, [
+    { childName: 'Niki', total: 2 },
+    { childName: 'Mila', total: 1 },
+  ]);
 
   result = await request('/api/feed');
   assert.equal(result.body.some(entry => entry.id === alphaEntryId), true);
   assert.equal(result.body.find(entry => entry.id === alphaEntryId).title, 'Edited [b]:laugh: by beta[/b]');
   assert.match(result.body.find(entry => entry.id === alphaEntryId).content, /Shared \[u\]:surprised:/);
   assert.equal(result.body.find(entry => entry.id === alphaEntryId).photo, TINY_PNG);
+  assert.deepEqual(result.body.find(entry => entry.id === alphaEntryId).childNames, ['Mila', 'Niki']);
   assert.deepEqual(result.body.find(entry => entry.id === alphaEntryId).tags, []);
   assert.equal(result.body.some(entry => entry.id === betaEntryId), false);
 
@@ -548,6 +579,7 @@ async function main() {
   result = await request('/api/export?format=txt', { token: beta, raw: true });
   assert.match(result.body, /Edited \[b\]:laugh: by beta\[\/b\]/);
   assert.match(result.body, /Beta entry/);
+  assert.match(result.body, /Дете:\s+Mila, Niki/);
   assert.match(result.body, /Shared \[u\]:surprised:\[\/u\]/);
   assert.match(result.body, /A \[i\]silly ending :silly:\[\/i\] then \[s\]angry :angry:\[\/s\]/);
   assert.match(result.body, /\[Има прикачена снимка\]/);
@@ -618,7 +650,7 @@ async function main() {
   assert.equal(result.status, 200);
   assert.equal(result.body.state.entries.some(entry => entry.id === betaEntryId), false);
 
-  console.log('Regression suite passed: auth, profiles, password, invites, merge, kids, entries, inline SVG emoticons, feed, export, logout, and admin routes.');
+  console.log('Regression suite passed: auth, profiles, password, invites, merge, kids, multi-child entries, inline SVG emoticons, feed, export, logout, and admin routes.');
 }
 
 main()

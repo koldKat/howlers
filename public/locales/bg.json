@@ -74,7 +74,7 @@
   "confirm_eyebrow": "Потвърждаване",
   "confirm_cancel": "Отказ",
 
-  "form_label_child": "Дете",
+  "form_label_child": "Деца",
   "form_label_date": "Дата",
   "form_label_title": "Заглавие",
   "form_label_category": "Категория",
@@ -119,9 +119,9 @@
   "delete_btn": "Изтрий",
 
   "placeholder_search": "Търсене по дете, заглавие, реплика, история или таг",
-  "placeholder_child": "Мила",
-  "child_select_placeholder": "Избери добавено дете",
-  "child_picker_hint": "Избери от добавените деца или въведи ново име.",
+  "placeholder_child": "Друго име или имена",
+  "child_select_placeholder": "Първо добави дете в „Нашите деца“.",
+  "child_picker_hint": "Избери едно или повече деца. Други имена се разделят със запетая.",
   "child_age_preview": "Възрастта ще се попълни автоматично: {age}",
   "placeholder_title": "Луната ни следва до вкъщи",
   "placeholder_content": "Запиши точната реплика и какво се случи.",

@@ -1,6 +1,7 @@
 'use strict';
 
 const { MAX_POST_PHOTO_BYTES } = require('./config');
+const { childNamesFromInput } = require('./child-names');
 const { isValidLocalDate } = require('./date-validation');
 const { validateRasterImageDataUrl } = require('./image-validation');
 
@@ -16,7 +17,10 @@ function normalizeMood(value) {
 }
 
 function validateHowler(body) {
-  const childName = String(body.childName || '').trim();
+  const normalizedChildren = childNamesFromInput(body);
+  if (normalizedChildren.error) return normalizedChildren;
+  const { childNames } = normalizedChildren;
+  const childName = childNames.join(', ');
   const title = String(body.title || '').trim();
   const hasCombinedContent = Object.prototype.hasOwnProperty.call(body, 'content');
   const content = String(body.content || '').trim();
@@ -31,10 +35,8 @@ function validateHowler(body) {
   const isPublic = Boolean(body.isPublic);
   const tags = Array.isArray(body.tags) ? body.tags : String(body.tags || '').split(',');
 
-  if (!childName) return { error: 'Името на детето е задължително.' };
   if (!title) return { error: 'Заглавието е задължително.' };
   if (!quote && !story) return { error: 'Добави текст към записа.' };
-  if (childName.length > 60) return { error: 'Името на детето е прекалено дълго.' };
   if (title.length > 120) return { error: 'Заглавието е прекалено дълго.' };
   if (hasCombinedContent && content.length > 5000) return { error: 'Текстът на записа е прекалено дълъг.' };
   if (!hasCombinedContent && quote.length > 800) return { error: 'Репликата е прекалено дълга.' };
@@ -48,7 +50,7 @@ function validateHowler(body) {
   if (happenedOn && !isValidLocalDate(happenedOn)) return { error: 'Въведи валидна дата във формат ГГГГ-ММ-ДД.' };
 
   return {
-    childName, title, quote, story, photo, happenedOn, ageNote,
+    childName, childNames, title, quote, story, photo, happenedOn, ageNote,
     category, mood, isFavorite, isPublic, tags,
   };
 }

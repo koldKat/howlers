@@ -56,12 +56,20 @@ npm start</code></pre>
 <h2>Repository layout</h2>
 <p>Server composition:</p>
 <ul>
-<li><code>server.js</code>: listener, top-level route table, and application handlers</li>
+<li><code>server.js</code>: process entry point, HTTP listener, SSE hub wiring, session cleanup, and backup startup</li>
+<li><code>server/app.js</code>: central request dispatcher and error boundary</li>
 <li><code>server/config.js</code>: paths, limits, backup policy, MIME types, and protected usernames</li>
 <li><code>server/http.js</code>: JSON responses, bounded request parsing, token extraction, and localhost detection</li>
 <li><code>server/date-validation.js</code>: shared local date formatting and real calendar date validation</li>
 <li><code>server/auth.js</code>: authenticated session guard</li>
-<li><code>server/db.js</code>: schema setup, migrations, queries, transactions, and backup snapshot creation</li>
+<li><code>server/db.js</code>: stable persistence facade used by routes and services</li>
+<li><code>server/db/connection.js</code>: SQLite connection and startup initialization</li>
+<li><code>server/db/schema.js</code>: idempotent schema creation, migrations, and family bootstrap</li>
+<li><code>server/db/accounts.js</code>: credentials, sessions, viewer data, and profile persistence</li>
+<li><code>server/db/families.js</code>: family membership, invitations, merges, and children</li>
+<li><code>server/db/entries.js</code>: entry queries, writes, mapping, and summaries</li>
+<li><code>server/db/admin.js</code>: admin reports, mutations, maintenance, and backup snapshots</li>
+<li><code>server/child-names.js</code>: singular and multi-child compatibility normalization</li>
 <li><code>server/state.js</code>: authenticated and guest state builders</li>
 <li><code>server/sse.js</code>: live client registry and state publishing</li>
 <li><code>server/static.js</code>: static files under <code>public/</code></li>
@@ -70,18 +78,28 @@ npm start</code></pre>
 <li><code>server/image-validation.js</code>: raster data URL size and signature checks</li>
 <li><code>server/howler-validation.js</code>: entry normalization and validation</li>
 <li><code>server/backup.js</code>: hourly ZIP creation and 14-day retention</li>
+<li><code>server/routes/session.js</code>: registration, login, logout, state, export, and SSE handlers</li>
+<li><code>server/routes/profile.js</code>: profile, avatar, and password handlers</li>
+<li><code>server/routes/families.js</code>: child and family-invitation handlers</li>
+<li><code>server/routes/entries.js</code>: entry create, update, and delete handlers</li>
 <li><code>server/routes/admin.js</code>: localhost-only admin handlers</li>
 </ul>
 <p>Browser code:</p>
 <ul>
 <li><code>public/index.html</code>: main app and modal structure</li>
 <li><code>public/site.webmanifest</code>, <code>public/favicon.svg</code>, and <code>public/icons/</code>: install metadata and app icon assets</li>
-<li><code>public/js/app.js</code>: UI orchestration, rendering, editor, profile, uploads, and SSE lifecycle</li>
+<li><code>public/js/app.js</code>: application boot, auth lifecycle, editor submission, dialogs, and SSE orchestration</li>
 <li><code>public/js/app/api.js</code>: token storage and JSON API wrapper</li>
 <li><code>public/js/app/constants.js</code>: categories, moods, emoticons, formatting, and client upload limits</li>
 <li><code>public/js/app/dom.js</code>: DOM references and backdrop dismissal</li>
+<li><code>public/js/app/child-picker.js</code>: multi-child selection and age-note calculation</li>
+<li><code>public/js/app/editor-tools.js</code>: formatting, shortcuts, emoticons, photo processing, and editor controls</li>
+<li><code>public/js/app/entry-presentation.js</code>: entry labels, metadata, inline formatting, and SVG emoticon rendering</li>
+<li><code>public/js/app/feed.js</code>: public and private feed rendering, filtering, and summary presentation</li>
 <li><code>public/js/app/feed-loading.js</code>: reusable feed-loader cloning and localized status updates</li>
 <li><code>public/js/app/format.js</code>: escaping, dates, and data URL sizing</li>
+<li><code>public/js/app/kids.js</code>: child-list rendering and child create/delete actions</li>
+<li><code>public/js/app/profile.js</code>: profile modal, avatars, passwords, exports, and family invitations</li>
 <li><code>public/js/i18n.js</code>: locale loading and DOM translation</li>
 <li><code>public/locales/bg.json</code>: Bulgarian strings</li>
 <li><code>public/admin.html</code>, <code>public/js/admin.js</code>, <code>public/js/admin/*</code>, <code>public/css/admin.css</code>: admin panel</li>
@@ -96,14 +114,14 @@ npm start</code></pre>
 <li><code>docs/*.html</code>: generated standalone equivalents</li>
 </ul>
 <h2>Request flow</h2>
-<p>The top-level server parses the URL, matches explicit API and SEO routes, and falls back to static GET handling. JSON request bodies are limited to 2 MiB and must contain an object. Oversized requests, malformed JSON, non-object JSON, and malformed encoded paths return <code>400</code> or <code>413</code> as appropriate.</p>
+<p><code>server.js</code> constructs the application dependencies and starts the listener. <code>server/app.js</code> parses the URL, dispatches explicit API and SEO routes to feature handlers, and falls back to static GET handling. Its awaited dispatch is the shared error boundary for synchronous and asynchronous route failures. JSON request bodies are limited to 2 MiB and must contain an object. Oversized requests, malformed JSON, non-object JSON, and malformed encoded paths return <code>400</code> or <code>413</code> as appropriate.</p>
 <p>API responses use JSON unless the route explicitly returns HTML, XML, plain text, an export, or an SSE stream. Unmatched non-GET routes return <code>404</code>.</p>
 <p>New usernames are trimmed and limited to 60 characters. Registration and password changes require passwords from 6 through 256 characters. Login remains compatible with existing credentials created before these limits were enforced.</p>
 <p>Static serving resolves paths below <code>public/</code> and rejects traversal outside that root.</p>
 <p>The install manifest exposes the SVG favicon with <code>purpose: any</code> and opaque 192 px and 512 px PNG icons with <code>purpose: any maskable</code>. The maskable declaration lets adaptive Android launchers clip the black canvas directly instead of placing it inside a white fallback circle. New maskable filenames prevent reuse of older cached icon files. The separate 180 px Apple touch icon uses the same sun artwork on a solid <code>#111111</code> background. The manifest also uses that color for its theme and launch background. PNG and web manifest files have explicit response MIME types.</p>
 <p>The feed starts with a functional loading state whose sun matches <code>public/favicon.svg</code>. Its eight rays are grouped into four opposite pairs and animated only through opacity, so each pair appears and disappears together. <code>public/js/app/feed-loading.js</code> retains the initial semantic loader as a template and restores it before public-feed transitions; this clears authenticated cards immediately during logout or session expiry instead of leaving private content visible while <code>/api/feed</code> is pending. Successful public or authenticated rendering replaces the loader directly. <code>prefers-reduced-motion: reduce</code> disables the ray animation and leaves all pairs visible.</p>
 <h2>Database and migrations</h2>
-<p>The database enables WAL mode and foreign keys at startup. Schema creation is idempotent. Older databases are upgraded with <code>addColumnIfMissing()</code> calls and a family bootstrap transaction.</p>
+<p>The database connection module enables WAL mode and foreign keys at startup, then delegates initialization to the schema module. Schema creation is idempotent. Older databases are upgraded with <code>addColumnIfMissing()</code> calls and a family bootstrap transaction. Feature repositories import the initialized connection and are combined through <code>server/db.js</code>, which keeps the existing persistence API stable for callers.</p>
 <h3><code>users</code></h3>
 <ul>
 <li><code>id</code>, <code>username</code>, <code>password_hash</code>, <code>salt</code>, <code>created_at</code></li>
@@ -131,12 +149,13 @@ npm start</code></pre>
 <p>Important columns:</p>
 <ul>
 <li>owner <code>user_id</code> and shared <code>family_id</code></li>
-<li><code>child_name</code>, <code>title</code>, <code>happened_on</code>, and <code>age_note</code></li>
+<li>legacy first-child <code>child_name</code>, full <code>child_names_json</code>, <code>title</code>, <code>happened_on</code>, and <code>age_note</code></li>
 <li>legacy <code>quote</code> plus current <code>story</code></li>
 <li><code>photo</code>, <code>category</code>, <code>mood</code>, and <code>tags_json</code></li>
 <li><code>is_favorite</code> and <code>is_public</code></li>
 <li><code>created_at</code> and <code>updated_at</code></li>
 </ul>
+<p><code>child_names_json</code> stores the complete ordered child-name list. <code>child_name</code> remains populated with the first name for backward storage compatibility. Startup migration backfills existing rows as one-item lists. API objects expose <code>childNames</code> plus a compatibility <code>childName</code> label that joins all names with commas. Create and update requests accept <code>childNames</code>; requests using the former singular <code>childName</code> remain valid.</p>
 <p>API objects expose derived <code>content</code> by joining non-empty <code>quote</code> and <code>story</code> values with one blank line. Current clients store the combined editor content in <code>story</code>; the old columns remain readable so earlier records are not lost.</p>
 <p>Entry photos use allowlisted raster data URLs and decode to no more than 512 KiB. Images and avatars are stored inside SQLite, so they contribute directly to database and backup size.</p>
 <h2>Authentication and authorization</h2>
@@ -184,7 +203,7 @@ npm start</code></pre>
 <li><code>POST /api/kids</code>: creates a child and returns <code>{ ok, kid }</code></li>
 <li><code>DELETE /api/kids/:id</code>: removes a child from the shared list</li>
 </ul>
-<p>Current entry input uses <code>content</code>. Legacy <code>quote</code> and <code>story</code> input remains accepted. Required values are child name, title, and non-empty text. Empty category and mood use <code>said</code> and <code>golden</code>; non-empty values must be in the fixed lists from <code>public/js/app/constants.js</code>.</p>
+<p>Current entry input uses <code>childNames</code> and <code>content</code>. Legacy <code>childName</code>, <code>quote</code>, and <code>story</code> input remains accepted. Required values are at least one child name, a title, and non-empty text. Child names are deduplicated case-insensitively and a request may contain up to 20 names. Empty category and mood use <code>said</code> and <code>golden</code>; non-empty values must be in the fixed lists from <code>public/js/app/constants.js</code>.</p>
 <p>New entries without <code>happenedOn</code> receive the server's current local date. Updates do not add a date to an intentionally undated old entry.</p>
 <h3>Family invites</h3>
 <ul>
@@ -215,7 +234,8 @@ npm start</code></pre>
 <h2>Entry validation</h2>
 <p>Server validation enforces:</p>
 <ul>
-<li>child name up to 60 characters</li>
+<li>one through 20 children per entry, deduplicated without regard to letter case</li>
+<li>each child name up to 60 characters</li>
 <li>title up to 120 characters</li>
 <li>current combined content up to 5,000 characters</li>
 <li>legacy quote up to 800 and story up to 4,000 characters</li>
@@ -272,7 +292,7 @@ npm run docs:build
 npm run docs:html-check
 npm run docs:check
 npm run hooks:install</code></pre>
-<p><code>npm test</code> starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, auth limits, profiles, passwords, avatars, invites, family merge, children and calendar dates, entries, formatting tokens, photos, public feed, SEO routes, export, logout, and admin routes.</p>
+<p><code>npm test</code> starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, auth limits, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, photos, public feed, SEO routes, export, logout, and admin routes.</p>
 <p><code>docs/*.md</code> files are the source of truth. <code>npm run docs:build</code> regenerates standalone HTML equivalents, while <code>npm run docs:html-check</code> fails if generated HTML is stale.</p>
 <p><code>npm run docs:check</code> examines staged application changes, including deletions, requires a staged Markdown documentation update when behavior, API, storage, setup, or maintainability changed, and verifies that all generated HTML files match their Markdown sources. A Git inspection error fails the check. <code>DOCS_GUARD_BYPASS=1</code> skips only the relevance check and still checks HTML synchronization.</p>
   </main>

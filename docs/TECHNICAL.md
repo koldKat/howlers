@@ -44,12 +44,20 @@ The server binds through `server.listen(PORT)` and is therefore reachable on the
 
 Server composition:
 
-- `server.js`: listener, top-level route table, and application handlers
+- `server.js`: process entry point, HTTP listener, SSE hub wiring, session cleanup, and backup startup
+- `server/app.js`: central request dispatcher and error boundary
 - `server/config.js`: paths, limits, backup policy, MIME types, and protected usernames
 - `server/http.js`: JSON responses, bounded request parsing, token extraction, and localhost detection
 - `server/date-validation.js`: shared local date formatting and real calendar date validation
 - `server/auth.js`: authenticated session guard
-- `server/db.js`: schema setup, migrations, queries, transactions, and backup snapshot creation
+- `server/db.js`: stable persistence facade used by routes and services
+- `server/db/connection.js`: SQLite connection and startup initialization
+- `server/db/schema.js`: idempotent schema creation, migrations, and family bootstrap
+- `server/db/accounts.js`: credentials, sessions, viewer data, and profile persistence
+- `server/db/families.js`: family membership, invitations, merges, and children
+- `server/db/entries.js`: entry queries, writes, mapping, and summaries
+- `server/db/admin.js`: admin reports, mutations, maintenance, and backup snapshots
+- `server/child-names.js`: singular and multi-child compatibility normalization
 - `server/state.js`: authenticated and guest state builders
 - `server/sse.js`: live client registry and state publishing
 - `server/static.js`: static files under `public/`
@@ -58,18 +66,28 @@ Server composition:
 - `server/image-validation.js`: raster data URL size and signature checks
 - `server/howler-validation.js`: entry normalization and validation
 - `server/backup.js`: hourly ZIP creation and 14-day retention
+- `server/routes/session.js`: registration, login, logout, state, export, and SSE handlers
+- `server/routes/profile.js`: profile, avatar, and password handlers
+- `server/routes/families.js`: child and family-invitation handlers
+- `server/routes/entries.js`: entry create, update, and delete handlers
 - `server/routes/admin.js`: localhost-only admin handlers
 
 Browser code:
 
 - `public/index.html`: main app and modal structure
 - `public/site.webmanifest`, `public/favicon.svg`, and `public/icons/`: install metadata and app icon assets
-- `public/js/app.js`: UI orchestration, rendering, editor, profile, uploads, and SSE lifecycle
+- `public/js/app.js`: application boot, auth lifecycle, editor submission, dialogs, and SSE orchestration
 - `public/js/app/api.js`: token storage and JSON API wrapper
 - `public/js/app/constants.js`: categories, moods, emoticons, formatting, and client upload limits
 - `public/js/app/dom.js`: DOM references and backdrop dismissal
+- `public/js/app/child-picker.js`: multi-child selection and age-note calculation
+- `public/js/app/editor-tools.js`: formatting, shortcuts, emoticons, photo processing, and editor controls
+- `public/js/app/entry-presentation.js`: entry labels, metadata, inline formatting, and SVG emoticon rendering
+- `public/js/app/feed.js`: public and private feed rendering, filtering, and summary presentation
 - `public/js/app/feed-loading.js`: reusable feed-loader cloning and localized status updates
 - `public/js/app/format.js`: escaping, dates, and data URL sizing
+- `public/js/app/kids.js`: child-list rendering and child create/delete actions
+- `public/js/app/profile.js`: profile modal, avatars, passwords, exports, and family invitations
 - `public/js/i18n.js`: locale loading and DOM translation
 - `public/locales/bg.json`: Bulgarian strings
 - `public/admin.html`, `public/js/admin.js`, `public/js/admin/*`, `public/css/admin.css`: admin panel
@@ -85,7 +103,7 @@ Documentation and verification:
 
 ## Request flow
 
-The top-level server parses the URL, matches explicit API and SEO routes, and falls back to static GET handling. JSON request bodies are limited to 2 MiB and must contain an object. Oversized requests, malformed JSON, non-object JSON, and malformed encoded paths return `400` or `413` as appropriate.
+`server.js` constructs the application dependencies and starts the listener. `server/app.js` parses the URL, dispatches explicit API and SEO routes to feature handlers, and falls back to static GET handling. Its awaited dispatch is the shared error boundary for synchronous and asynchronous route failures. JSON request bodies are limited to 2 MiB and must contain an object. Oversized requests, malformed JSON, non-object JSON, and malformed encoded paths return `400` or `413` as appropriate.
 
 API responses use JSON unless the route explicitly returns HTML, XML, plain text, an export, or an SSE stream. Unmatched non-GET routes return `404`.
 
@@ -99,7 +117,7 @@ The feed starts with a functional loading state whose sun matches `public/favico
 
 ## Database and migrations
 
-The database enables WAL mode and foreign keys at startup. Schema creation is idempotent. Older databases are upgraded with `addColumnIfMissing()` calls and a family bootstrap transaction.
+The database connection module enables WAL mode and foreign keys at startup, then delegates initialization to the schema module. Schema creation is idempotent. Older databases are upgraded with `addColumnIfMissing()` calls and a family bootstrap transaction. Feature repositories import the initialized connection and are combined through `server/db.js`, which keeps the existing persistence API stable for callers.
 
 ### `users`
 
@@ -138,11 +156,13 @@ Children have an owner `user_id`, shared `family_id`, name, optional `dob`, and 
 Important columns:
 
 - owner `user_id` and shared `family_id`
-- `child_name`, `title`, `happened_on`, and `age_note`
+- legacy first-child `child_name`, full `child_names_json`, `title`, `happened_on`, and `age_note`
 - legacy `quote` plus current `story`
 - `photo`, `category`, `mood`, and `tags_json`
 - `is_favorite` and `is_public`
 - `created_at` and `updated_at`
+
+`child_names_json` stores the complete ordered child-name list. `child_name` remains populated with the first name for backward storage compatibility. Startup migration backfills existing rows as one-item lists. API objects expose `childNames` plus a compatibility `childName` label that joins all names with commas. Create and update requests accept `childNames`; requests using the former singular `childName` remain valid.
 
 API objects expose derived `content` by joining non-empty `quote` and `story` values with one blank line. Current clients store the combined editor content in `story`; the old columns remain readable so earlier records are not lost.
 
@@ -199,7 +219,7 @@ Authenticated state contains `app`, `viewer`, `profile`, `attention`, `summary`,
 - `POST /api/kids`: creates a child and returns `{ ok, kid }`
 - `DELETE /api/kids/:id`: removes a child from the shared list
 
-Current entry input uses `content`. Legacy `quote` and `story` input remains accepted. Required values are child name, title, and non-empty text. Empty category and mood use `said` and `golden`; non-empty values must be in the fixed lists from `public/js/app/constants.js`.
+Current entry input uses `childNames` and `content`. Legacy `childName`, `quote`, and `story` input remains accepted. Required values are at least one child name, a title, and non-empty text. Child names are deduplicated case-insensitively and a request may contain up to 20 names. Empty category and mood use `said` and `golden`; non-empty values must be in the fixed lists from `public/js/app/constants.js`.
 
 New entries without `happenedOn` receive the server's current local date. Updates do not add a date to an intentionally undated old entry.
 
@@ -236,7 +256,8 @@ Admin entry mutation returns `404` when the entry does not exist. Protected-user
 
 Server validation enforces:
 
-- child name up to 60 characters
+- one through 20 children per entry, deduplicated without regard to letter case
+- each child name up to 60 characters
 - title up to 120 characters
 - current combined content up to 5,000 characters
 - legacy quote up to 800 and story up to 4,000 characters
@@ -315,7 +336,7 @@ npm run docs:check
 npm run hooks:install
 ```
 
-`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, auth limits, profiles, passwords, avatars, invites, family merge, children and calendar dates, entries, formatting tokens, photos, public feed, SEO routes, export, logout, and admin routes.
+`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, auth limits, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, photos, public feed, SEO routes, export, logout, and admin routes.
 
 `docs/*.md` files are the source of truth. `npm run docs:build` regenerates standalone HTML equivalents, while `npm run docs:html-check` fails if generated HTML is stale.
 
