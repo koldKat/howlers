@@ -5,6 +5,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { buildMultiChildAgeNote } = require('../server/entry-ages');
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'howlers-regression-'));
 const databasePath = path.join(tempDir, 'database.sqlite');
@@ -93,6 +94,11 @@ function localDateString(date = new Date()) {
 }
 
 async function main() {
+  assert.equal(buildMultiChildAgeNote(
+    ['Mila', 'Niki'],
+    [{ name: 'Mila', dob: '2022-01-15' }, { name: 'Niki', dob: '2021-05-04' }],
+    '2026-06-01'
+  ), 'Mila: 4 г. 4 мес.; Niki: 5 г.');
   await waitForServer();
 
   let result = await request('/%E0%A4%A', { raw: true });
@@ -131,6 +137,11 @@ async function main() {
   result = await request('/js/app/kids.js', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, /export function createKidsController/);
+
+  result = await request('/js/app/child-picker.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /const selectedCount = selectedKids\.length \+ customNames\(\)\.length/);
+  assert.match(result.body, /ages\.map\(\(\{ kid, age \}\) => `\$\{kid\.name\}: \$\{age\}`\)\.join\('; '\)/);
 
   const manifestResponse = await fetch(`${baseUrl}/site.webmanifest`);
   assert.equal(manifestResponse.status, 200);
@@ -447,6 +458,13 @@ async function main() {
   });
   assert.equal(result.status, 400);
 
+  result = await request('/api/kids', {
+    token: alpha,
+    method: 'POST',
+    body: { name: 'Mila', dob: '2022-01-15' },
+  });
+  assert.equal(result.status, 200);
+
   result = await request(`/api/howlers/${alphaEntryId}`, {
     token: beta,
     method: 'PUT',
@@ -468,6 +486,7 @@ async function main() {
   assert.equal(result.body.entry.title, 'Edited [b]:laugh: by beta[/b]');
   assert.deepEqual(result.body.entry.childNames, ['Mila', 'Niki']);
   assert.equal(result.body.entry.childName, 'Mila, Niki');
+  assert.equal(result.body.entry.ageNote, 'Mila: 4 г. 4 мес.; Niki: 5 г.');
   assert.equal(result.body.entry.quote, '');
   assert.equal(result.body.entry.story, 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]');
   assert.equal(result.body.entry.content, 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]');
@@ -580,6 +599,7 @@ async function main() {
   assert.match(result.body, /Edited \[b\]:laugh: by beta\[\/b\]/);
   assert.match(result.body, /Beta entry/);
   assert.match(result.body, /Дете:\s+Mila, Niki/);
+  assert.match(result.body, /Възраст:\s+Mila: 4 г\. 4 мес\.; Niki: 5 г\./);
   assert.match(result.body, /Shared \[u\]:surprised:\[\/u\]/);
   assert.match(result.body, /A \[i\]silly ending :silly:\[\/i\] then \[s\]angry :angry:\[\/s\]/);
   assert.match(result.body, /\[Има прикачена снимка\]/);

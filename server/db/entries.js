@@ -1,5 +1,6 @@
 const db = require('./connection');
 const { childNamesFromRow } = require('../child-names');
+const { buildMultiChildAgeNote } = require('../entry-ages');
 const { getFamilyIdForUser } = require('./families');
 
 function normalizeTags(tags) {
@@ -7,7 +8,11 @@ function normalizeTags(tags) {
   return [...new Set(list.map(tag => String(tag).trim()).filter(Boolean))].slice(0, 8);
 }
 
-function mapEntry(row) {
+function listFamilyKids(familyId) {
+  return db.prepare('SELECT name, dob FROM kids WHERE family_id = ?').all(familyId);
+}
+
+function mapEntry(row, familyKids = []) {
   const content = [row.quote, row.story].map(value => String(value || '').trim()).filter(Boolean).join('\n\n');
   const childNames = childNamesFromRow(row);
   let tags = [];
@@ -19,7 +24,9 @@ function mapEntry(row) {
   return {
     id: row.id, childName: childNames.join(', '), childNames, title: row.title,
     quote: row.quote, story: row.story, content, photo: row.photo || '', category: row.category,
-    happenedOn: row.happened_on, ageNote: row.age_note, mood: row.mood, tags,
+    happenedOn: row.happened_on,
+    ageNote: buildMultiChildAgeNote(childNames, familyKids, row.happened_on) || row.age_note,
+    mood: row.mood, tags,
     isPublic: Boolean(row.is_public), isFavorite: Boolean(row.is_favorite),
     createdAt: row.created_at ? Number(row.created_at) : null,
     updatedAt: row.updated_at ? Number(row.updated_at) : null,
@@ -28,15 +35,16 @@ function mapEntry(row) {
 
 function listHowlers(userId) {
   const familyId = getFamilyIdForUser(userId);
+  const familyKids = listFamilyKids(familyId);
   return db.prepare(`SELECT * FROM howlers WHERE family_id = ?
     ORDER BY COALESCE(NULLIF(happened_on, ''), '') DESC, updated_at DESC, id DESC`)
-    .all(familyId).map(mapEntry);
+    .all(familyId).map(row => mapEntry(row, familyKids));
 }
 
 function getHowler(userId, howlerId) {
   const row = db.prepare('SELECT * FROM howlers WHERE family_id = ? AND id = ?')
     .get(getFamilyIdForUser(userId), howlerId);
-  return row ? mapEntry(row) : null;
+  return row ? mapEntry(row, listFamilyKids(row.family_id)) : null;
 }
 
 function createHowler(userId, input) {
@@ -68,14 +76,18 @@ function updateHowler(userId, howlerId, input) {
 }
 
 function listPublicHowlers(limit) {
+  const kidsByFamily = new Map();
   return db.prepare(`SELECT * FROM howlers WHERE is_public = 1
     ORDER BY COALESCE(NULLIF(happened_on, ''), '') DESC, updated_at DESC, id DESC LIMIT ?`)
-    .all(limit || 60).map(row => ({ ...mapEntry(row), tags: [] }));
+    .all(limit || 60).map(row => {
+      if (!kidsByFamily.has(row.family_id)) kidsByFamily.set(row.family_id, listFamilyKids(row.family_id));
+      return { ...mapEntry(row, kidsByFamily.get(row.family_id)), tags: [] };
+    });
 }
 
 function getPublicHowler(id) {
   const row = db.prepare('SELECT * FROM howlers WHERE id = ? AND is_public = 1').get(id);
-  return row ? { ...mapEntry(row), tags: [] } : null;
+  return row ? { ...mapEntry(row, listFamilyKids(row.family_id)), tags: [] } : null;
 }
 
 function deleteHowler(userId, howlerId) {
@@ -104,8 +116,9 @@ function getSummary(userId) {
   const kids = [...childCounts.values()].sort((a, b) =>
     b.total - a.total || a.childName.localeCompare(b.childName, 'bg-BG')
   );
+  const familyKids = listFamilyKids(familyId);
   const recent = db.prepare('SELECT * FROM howlers WHERE family_id = ? ORDER BY updated_at DESC, id DESC LIMIT 6')
-    .all(familyId).map(mapEntry);
+    .all(familyId).map(row => mapEntry(row, familyKids));
   return {
     total: Number(totals.total || 0), favorites: Number(totals.favorites || 0), kids: kids.length,
     firstCreatedAt: totals.first_created_at ? Number(totals.first_created_at) : null,

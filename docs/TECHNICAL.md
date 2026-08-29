@@ -49,6 +49,7 @@ Server composition:
 - `server/config.js`: paths, limits, backup policy, MIME types, and protected usernames
 - `server/http.js`: JSON responses, bounded request parsing, token extraction, and localhost detection
 - `server/date-validation.js`: shared local date formatting and real calendar date validation
+- `server/entry-ages.js`: backward-compatible per-child age snapshots for multi-child entries
 - `server/auth.js`: authenticated session guard
 - `server/db.js`: stable persistence facade used by routes and services
 - `server/db/connection.js`: SQLite connection and startup initialization
@@ -163,6 +164,8 @@ Important columns:
 - `created_at` and `updated_at`
 
 `child_names_json` stores the complete ordered child-name list. `child_name` remains populated with the first name for backward storage compatibility. Startup migration backfills existing rows as one-item lists. API objects expose `childNames` plus a compatibility `childName` label that joins all names with commas. Create and update requests accept `childNames`; requests using the former singular `childName` remain valid.
+
+The browser derives `age_note` from the entry date and every selected saved child that has a birth date. A single child keeps the compact age value. Multiple children use semicolon-separated name-to-age pairs so the stored snapshot and all feed/export views remain unambiguous. A manually edited age note is preserved.
 
 API objects expose derived `content` by joining non-empty `quote` and `story` values with one blank line. Current clients store the combined editor content in `story`; the old columns remain readable so earlier records are not lost.
 

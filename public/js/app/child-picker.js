@@ -58,31 +58,29 @@ export function createChildPicker({ container, customInput, ageNoteInput, agePre
   function clearAutoAgeNote() {
     if (ageNoteInput.dataset.autoAge === 'true') ageNoteInput.value = '';
     delete ageNoteInput.dataset.autoAge;
-    delete ageNoteInput.dataset.autoKidId;
+    delete ageNoteInput.dataset.autoKidIds;
     showAgePreview('');
   }
 
   function applyAge({ force = false } = {}) {
     const selectedKids = selectedKnownKids();
-    const kid = selectedKids.length === 1 && customNames().length === 0 ? selectedKids[0] : null;
-    if (!kid?.dob) {
+    const selectedCount = selectedKids.length + customNames().length;
+    const ages = selectedKids
+      .map(kid => ({ kid, age: calculateAgeAtDate(kid.dob, happenedOnInput.value) }))
+      .filter(item => item.age);
+    if (!ages.length) {
       clearAutoAgeNote();
       return;
     }
 
-    const ageNote = calculateAgeAtDate(kid.dob, happenedOnInput.value);
+    const ageNote = selectedCount > 1
+      ? ages.map(({ kid, age }) => `${kid.name}: ${age}`).join('; ')
+      : ages[0].age;
     showAgePreview(ageNote);
-    if (!ageNote) {
-      if (ageNoteInput.dataset.autoAge === 'true') ageNoteInput.value = '';
-      delete ageNoteInput.dataset.autoAge;
-      delete ageNoteInput.dataset.autoKidId;
-      return;
-    }
-
     if (force || !ageNoteInput.value.trim() || ageNoteInput.dataset.autoAge === 'true') {
       ageNoteInput.value = ageNote;
       ageNoteInput.dataset.autoAge = 'true';
-      ageNoteInput.dataset.autoKidId = String(kid.id);
+      ageNoteInput.dataset.autoKidIds = ages.map(({ kid }) => kid.id).join(',');
     }
   }
 
@@ -118,7 +116,7 @@ export function createChildPicker({ container, customInput, ageNoteInput, agePre
   function setAgeNote(value) {
     ageNoteInput.value = value || '';
     delete ageNoteInput.dataset.autoAge;
-    delete ageNoteInput.dataset.autoKidId;
+    delete ageNoteInput.dataset.autoKidIds;
     showAgePreview('');
     if (!ageNoteInput.value) applyAge();
   }
@@ -128,7 +126,7 @@ export function createChildPicker({ container, customInput, ageNoteInput, agePre
     for (const input of container.querySelectorAll('input[data-kid-id]')) input.checked = false;
     ageNoteInput.value = '';
     delete ageNoteInput.dataset.autoAge;
-    delete ageNoteInput.dataset.autoKidId;
+    delete ageNoteInput.dataset.autoKidIds;
     showAgePreview('');
   }
 
@@ -138,7 +136,7 @@ export function createChildPicker({ container, customInput, ageNoteInput, agePre
   ageNoteInput.addEventListener('input', () => {
     if (ageNoteInput.value.trim()) {
       delete ageNoteInput.dataset.autoAge;
-      delete ageNoteInput.dataset.autoKidId;
+      delete ageNoteInput.dataset.autoKidIds;
       showAgePreview('');
       return;
     }

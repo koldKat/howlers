@@ -61,6 +61,7 @@ npm start</code></pre>
 <li><code>server/config.js</code>: paths, limits, backup policy, MIME types, and protected usernames</li>
 <li><code>server/http.js</code>: JSON responses, bounded request parsing, token extraction, and localhost detection</li>
 <li><code>server/date-validation.js</code>: shared local date formatting and real calendar date validation</li>
+<li><code>server/entry-ages.js</code>: backward-compatible per-child age snapshots for multi-child entries</li>
 <li><code>server/auth.js</code>: authenticated session guard</li>
 <li><code>server/db.js</code>: stable persistence facade used by routes and services</li>
 <li><code>server/db/connection.js</code>: SQLite connection and startup initialization</li>
@@ -156,6 +157,7 @@ npm start</code></pre>
 <li><code>created_at</code> and <code>updated_at</code></li>
 </ul>
 <p><code>child_names_json</code> stores the complete ordered child-name list. <code>child_name</code> remains populated with the first name for backward storage compatibility. Startup migration backfills existing rows as one-item lists. API objects expose <code>childNames</code> plus a compatibility <code>childName</code> label that joins all names with commas. Create and update requests accept <code>childNames</code>; requests using the former singular <code>childName</code> remain valid.</p>
+<p>The browser derives <code>age_note</code> from the entry date and every selected saved child that has a birth date. A single child keeps the compact age value. Multiple children use semicolon-separated name-to-age pairs so the stored snapshot and all feed/export views remain unambiguous. A manually edited age note is preserved.</p>
 <p>API objects expose derived <code>content</code> by joining non-empty <code>quote</code> and <code>story</code> values with one blank line. Current clients store the combined editor content in <code>story</code>; the old columns remain readable so earlier records are not lost.</p>
 <p>Entry photos use allowlisted raster data URLs and decode to no more than 512 KiB. Images and avatars are stored inside SQLite, so they contribute directly to database and backup size.</p>
 <h2>Authentication and authorization</h2>
