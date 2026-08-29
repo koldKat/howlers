@@ -153,6 +153,14 @@
   "no_data_chip": "Все още няма данни",
   "tag_favorite": "Любим",
   "entry_edit_btn": "Редактирай",
+  "entry_open_btn": "Отвори",
+  "post_share_btn": "Сподели",
+  "post_detail_eyebrow": "Споделен бисер",
+  "post_detail_title": "Споделен запис",
+  "post_detail_loading": "Зареждане на записа...",
+  "post_detail_unavailable": "Този запис не е достъпен или вече не съществува.",
+  "post_share_copied": "Връзката е копирана.",
+  "post_share_failed": "Връзката не можа да бъде копирана.",
 
   "editor_title_add": "Добави запис",
   "editor_title_edit": "Редактирай запис",
@@ -230,6 +238,7 @@
   "profile_error_avatar_too_large": "Снимката е прекалено голяма. Макс. 300 KB.",
 
   "panel_kids_title": "Нашите деца",
+  "mobile_family_settings": "Семейни настройки",
   "panel_kids_empty": "Все още няма добавени деца.",
   "kids_add_placeholder_name": "Име или прякор",
   "kids_add_btn": "Добави",

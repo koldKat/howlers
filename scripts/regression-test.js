@@ -54,6 +54,7 @@ async function request(pathname, { token, method = 'GET', body, bodyText, raw = 
   });
   return {
     status: response.status,
+    headers: response.headers,
     body: raw ? await response.text() : await response.json(),
   };
 }
@@ -101,7 +102,13 @@ async function main() {
   ), 'Mila: 4 г. 4 мес.; Niki: 5 г.');
   await waitForServer();
 
-  let result = await request('/%E0%A4%A', { raw: true });
+  let result = await request('/', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /<nav class="site-nav">[\s\S]*id="mobile-family-settings"[\s\S]*<\/nav>/);
+  assert.match(result.body, /class="mobile-family-settings-icon"/);
+  assert.match(result.body, /id="mobile-family-settings-close"/);
+
+  result = await request('/%E0%A4%A', { raw: true });
   assert.equal(result.status, 400);
   assert.match(result.body, /Невалиден адрес/);
 
@@ -128,11 +135,29 @@ async function main() {
   assert.equal(result.status, 200);
   assert.match(result.body, /createFeedController/);
   assert.match(result.body, /kidsController\.render\(\[\]\)/);
+  assert.match(result.body, /window\.visualViewport/);
+  assert.match(result.body, /await postDetailController\.openInitialRoute\(\);\s+editorTools\.initializeControls\(\)/);
+  assert.match(result.body, /els\.editorDialog\.scrollTop = 0/);
   assert.doesNotMatch(result.body, /latestKids/);
+
+  result = await request('/css/style.css', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /--editor-viewport-height/);
+  assert.match(result.body, /\.editor-dialog-head\s*\{[\s\S]*position: sticky/);
+  assert.match(result.body, /\.post-detail-dialog\[data-server-rendered\]\[open\]/);
+  assert.match(result.body, /\.entry-content\s*\{[\s\S]*text-align: justify/);
+  assert.match(result.body, /#mobile-family-settings,\s*\.mobile-sidebar-head\s*\{ display: none; \}/);
+  assert.match(result.body, /@media \(max-width: 860px\)[\s\S]*#mobile-family-settings\s*\{ display: inline-flex; \}/);
 
   result = await request('/js/app/feed.js', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, /export function createFeedController/);
+
+  result = await request('/js/app/post-detail.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /prepareDialog\(entry\.isPublic && !isPrivateLink\)/);
+  assert.match(result.body, /<h1 class="list-item-title">/);
+  assert.match(result.body, /restoreBaseMetadata/);
 
   result = await request('/js/app/kids.js', { raw: true });
   assert.equal(result.status, 200);
@@ -164,6 +189,7 @@ async function main() {
   assert.match(result.body, /<link rel="manifest" href="\/site\.webmanifest">/);
   assert.match(result.body, /<link rel="apple-touch-icon" sizes="180x180" href="\/icons\/apple-touch-icon\.png">/);
   assert.match(result.body, /class="feed-loading" role="status" aria-live="polite"/);
+  assert.match(result.body, /class="panel-head editor-dialog-head"/);
   assert.equal((result.body.match(/class="feed-loading-spoke feed-loading-spoke-\d"/g) || []).length, 4);
   assert.match(result.body, /feed-loading-spoke-1[^>]*><path d="M32 7\.5v9" \/><path d="M32 47\.5v9"/);
 
@@ -292,6 +318,40 @@ async function main() {
     token: alpha,
     method: 'DELETE',
   })).status, 200);
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({
+      title: '',
+      quote: '',
+      story: '',
+      photo: TINY_PNG,
+      happenedOn: '2018-03-14',
+      isPublic: true,
+    }),
+  });
+  assert.equal(result.status, 200);
+  const backdatedPhotoId = result.body.entry.id;
+  assert.equal(result.body.entry.title, 'Снимка');
+  assert.equal(result.body.entry.content, '');
+  assert.equal(result.body.entry.photo, TINY_PNG);
+  assert.equal(result.body.entry.happenedOn, '2018-03-14');
+  assert.equal(result.body.state.entries[0].id, backdatedPhotoId);
+  result = await request('/api/feed');
+  assert.equal(result.body[0].id, backdatedPhotoId);
+  assert.equal((await request(`/api/howlers/${backdatedPhotoId}`, {
+    token: alpha,
+    method: 'DELETE',
+  })).status, 200);
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({ quote: '', story: '', photo: '' }),
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Добави текст или снимка към записа.');
 
   result = await request('/api/howlers', {
     token: alpha,
@@ -509,24 +569,90 @@ async function main() {
 
   result = await request('/api/state', { token: alpha });
   assert.deepEqual(result.body.entries.find(entry => entry.id === alphaEntryId).tags, ['shared']);
+  assert.equal(JSON.stringify(result.body).includes('share_token'), false);
+  assert.equal(JSON.stringify(result.body).includes('shareToken'), false);
+
+  result = await request(`/api/howlers/${alphaEntryId}/share`, { token: alpha, method: 'POST' });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.path, `/posts/${alphaEntryId}`);
+
+  result = await request(`/api/howlers/${betaEntryId}/share`, { method: 'POST' });
+  assert.equal(result.status, 401);
+  result = await request(`/api/howlers/${betaEntryId}/share`, { token: gamma, method: 'POST' });
+  assert.equal(result.status, 404);
+
+  result = await request(`/api/howlers/${betaEntryId}/share`, { token: beta, method: 'POST' });
+  assert.equal(result.status, 200);
+  assert.equal(result.headers.get('cache-control'), 'private, no-store');
+  assert.match(result.body.path, /^\/shared\/[A-Za-z0-9_-]{32}$/);
+  const privateSharePath = result.body.path;
+  const privateShareToken = privateSharePath.split('/').pop();
+
+  result = await request(`/api/howlers/${betaEntryId}/share`, { token: beta, method: 'POST' });
+  assert.equal(result.body.path, privateSharePath);
+
+  result = await request(`/api/shared/${privateShareToken}`);
+  assert.equal(result.status, 200);
+  assert.equal(result.headers.get('cache-control'), 'private, no-store');
+  assert.equal(result.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal(result.body.id, betaEntryId);
+  assert.equal(result.body.isPublic, false);
+  assert.deepEqual(result.body.tags, []);
+  assert.equal(JSON.stringify(result.body).includes(privateShareToken), false);
+
+  result = await request(`/api/public/howlers/${alphaEntryId}`);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.id, alphaEntryId);
+  result = await request(`/api/public/howlers/${betaEntryId}`);
+  assert.equal(result.status, 404);
 
   result = await request('/sitemap.xml', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, new RegExp(`<loc>http://127\\.0\\.0\\.1:${port}/</loc>`));
   assert.match(result.body, new RegExp(`<loc>http://127\\.0\\.0\\.1:${port}/posts/${alphaEntryId}</loc>`));
   assert.doesNotMatch(result.body, new RegExp(`/posts/${betaEntryId}</loc>`));
+  assert.doesNotMatch(result.body, new RegExp(privateShareToken));
 
   result = await request('/robots.txt', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, new RegExp(`Sitemap: http://127\\.0\\.0\\.1:${port}/sitemap\\.xml`));
   assert.match(result.body, /Disallow: \/api\//);
+  assert.doesNotMatch(result.body, /Disallow: \/shared\//);
 
   result = await request(`/posts/${alphaEntryId}`, { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, /<link rel="canonical"/);
   assert.match(result.body, /Семейни бисери/);
   assert.match(result.body, /"datePublished":"\d{4}-\d{2}-\d{2}T/);
+  assert.match(result.body, /data-server-rendered="true"/);
+  assert.match(result.body, /<button id="post-detail-share"/);
+  assert.doesNotMatch(result.body, /<button hidden id="post-detail-share"/);
   assert.doesNotMatch(result.body, /shared/);
+  assert.doesNotMatch(result.body, /id="post-detail-title"/);
+
+  result = await request(privateSharePath, { raw: true });
+  assert.equal(result.status, 200);
+  assert.equal(result.headers.get('cache-control'), 'private, no-store');
+  assert.equal(result.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal(result.headers.get('x-robots-tag'), 'noindex, nofollow');
+  assert.match(result.body, /<meta name="robots" content="noindex,nofollow">/);
+  assert.match(result.body, /<meta name="referrer" content="no-referrer">/);
+  assert.match(result.body, /id="post-detail-dialog"/);
+  assert.match(result.body, /data-server-rendered="true"/);
+  assert.match(result.body, /<button hidden id="post-detail-share"/);
+  assert.match(result.body, /aria-labelledby="post-detail-eyebrow"/);
+  assert.doesNotMatch(result.body, /id="post-detail-title"/);
+  assert.match(result.body, /id="initial-post-detail"/);
+  assert.match(result.body, new RegExp(privateShareToken));
+
+  result = await request('/shared/not-a-valid-token', { raw: true });
+  assert.equal(result.status, 404);
+
+  result = await request(`/shared/${'A'.repeat(32)}`, { raw: true });
+  assert.equal(result.status, 404);
+  assert.equal(result.headers.get('cache-control'), 'private, no-store');
+  assert.equal(result.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal(result.headers.get('x-robots-tag'), 'noindex, nofollow');
 
   result = await request(`/posts/${betaEntryId}`, { raw: true });
   assert.equal(result.status, 404);
@@ -669,8 +795,9 @@ async function main() {
   });
   assert.equal(result.status, 200);
   assert.equal(result.body.state.entries.some(entry => entry.id === betaEntryId), false);
+  assert.equal((await request(`/api/shared/${privateShareToken}`)).status, 404);
 
-  console.log('Regression suite passed: auth, profiles, password, invites, merge, kids, multi-child entries, inline SVG emoticons, feed, export, logout, and admin routes.');
+  console.log('Regression suite passed: auth, profiles, invites, kids, entries, photos, sharing, SEO, feed, export, logout, and admin routes.');
 }
 
 main()

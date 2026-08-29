@@ -71,6 +71,7 @@ function initializeSchema(db) {
       mood TEXT NOT NULL DEFAULT 'golden',
       tags_json TEXT NOT NULL DEFAULT '[]',
       is_favorite INTEGER NOT NULL DEFAULT 0,
+      share_token TEXT,
       created_at INTEGER DEFAULT (strftime('%s', 'now')),
       updated_at INTEGER DEFAULT (strftime('%s', 'now')),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -85,11 +86,13 @@ function initializeSchema(db) {
   addColumnIfMissing(db, 'howlers', 'family_id', 'ALTER TABLE howlers ADD COLUMN family_id INTEGER');
   addColumnIfMissing(db, 'howlers', 'photo', "ALTER TABLE howlers ADD COLUMN photo TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(db, 'howlers', 'child_names_json', "ALTER TABLE howlers ADD COLUMN child_names_json TEXT NOT NULL DEFAULT '[]'");
+  addColumnIfMissing(db, 'howlers', 'share_token', 'ALTER TABLE howlers ADD COLUMN share_token TEXT');
   addColumnIfMissing(db, 'users', 'locale', "ALTER TABLE users ADD COLUMN locale TEXT NOT NULL DEFAULT 'bg'");
   addColumnIfMissing(db, 'users', 'display_name', 'ALTER TABLE users ADD COLUMN display_name TEXT');
   addColumnIfMissing(db, 'users', 'avatar', 'ALTER TABLE users ADD COLUMN avatar TEXT');
   addColumnIfMissing(db, 'sessions', 'last_active_at', 'ALTER TABLE sessions ADD COLUMN last_active_at INTEGER');
   addColumnIfMissing(db, 'kids', 'family_id', 'ALTER TABLE kids ADD COLUMN family_id INTEGER');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_howlers_share_token ON howlers(share_token) WHERE share_token IS NOT NULL');
 
   const bootstrapFamilies = db.transaction(() => {
     const users = db.prepare('SELECT id FROM users ORDER BY id ASC').all();

@@ -7,6 +7,7 @@ import { createFeedController } from './app/feed.js';
 import { createFeedLoader } from './app/feed-loading.js';
 import { formatDate } from './app/format.js';
 import { createKidsController } from './app/kids.js';
+import { createPostDetailController } from './app/post-detail.js';
 import { createProfileController } from './app/profile.js';
 
 const els = getAppElements();
@@ -41,11 +42,13 @@ const feedController = createFeedController(els, {
   }),
   onViewer: nextViewer => { viewer = { ...viewer, ...nextViewer }; },
 });
+const postDetailController = createPostDetailController(els);
 
 // ── Auth state ──────────────────────────────────────────────
 
 function setAuthState(isLoggedIn) {
   els.navAddBtn.style.display    = isLoggedIn ? '' : 'none';
+  els.mobileFamilySettings.style.display = isLoggedIn ? '' : 'none';
   els.navViewer.style.display    = isLoggedIn ? '' : 'none';
   els.navLogoutBtn.style.display = isLoggedIn ? '' : 'none';
   els.navLoginBtn.style.display  = isLoggedIn ? 'none' : '';
@@ -61,11 +64,49 @@ function showAuthModal(show) {
   els.authModal.style.display = show ? 'flex' : 'none';
 }
 
+function setMobileFamilySettingsOpen(open) {
+  const shouldOpen = Boolean(open) && window.matchMedia('(max-width: 860px)').matches;
+  const wasOpen = els.feedSidebar.classList.contains('mobile-open');
+  els.feedSidebar.classList.toggle('mobile-open', shouldOpen);
+  els.mobileFamilySettings.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+  document.body.classList.toggle('mobile-family-settings-open', shouldOpen);
+  if (shouldOpen) {
+    els.feedSidebar.setAttribute('role', 'dialog');
+    els.feedSidebar.setAttribute('aria-modal', 'true');
+    els.feedSidebar.setAttribute('aria-label', t('mobile_family_settings'));
+    els.mobileFamilySettingsClose.focus();
+  } else {
+    els.feedSidebar.removeAttribute('role');
+    els.feedSidebar.removeAttribute('aria-modal');
+    els.feedSidebar.removeAttribute('aria-label');
+    if (wasOpen && window.matchMedia('(max-width: 860px)').matches) els.mobileFamilySettings.focus();
+  }
+}
+
 // ── Editor ──────────────────────────────────────────────────
 
 function isEditorOpen() { return els.editorOverlay.classList.contains('active'); }
-function openEditor()   { els.editorOverlay.classList.add('active'); }
-function closeEditor()  { els.editorOverlay.classList.remove('active'); els.formError.textContent = ''; }
+
+function syncEditorViewport() {
+  const viewport = window.visualViewport;
+  const height = Math.round(viewport?.height || window.innerHeight);
+  const top = Math.round(viewport?.offsetTop || 0);
+  els.editorOverlay.style.setProperty('--editor-viewport-height', `${height}px`);
+  els.editorOverlay.style.setProperty('--editor-viewport-top', `${top}px`);
+}
+
+function openEditor() {
+  syncEditorViewport();
+  els.editorDialog.scrollTop = 0;
+  els.editorOverlay.classList.add('active');
+  document.body.classList.add('editor-open');
+}
+
+function closeEditor() {
+  els.editorOverlay.classList.remove('active');
+  document.body.classList.remove('editor-open');
+  els.formError.textContent = '';
+}
 
 function setEditorAdvancedOpen(open) {
   editorAdvancedOpen = Boolean(open);
@@ -249,6 +290,7 @@ async function becomeGuest() {
   closeEditor();
   resetForm();
   setAuthState(false);
+  setMobileFamilySettingsOpen(false);
   showAuthModal(false);
   await feedController.loadPublicFeed();
   openEvents();
@@ -296,6 +338,7 @@ async function deleteEntry() {
 
 async function boot() {
   await initI18n();
+  await postDetailController.openInitialRoute();
   editorTools.initializeControls();
   if (!getToken()) {
     setAuthState(false);
@@ -319,6 +362,8 @@ els.navLoginBtn.addEventListener('click', () => showAuthModal(true));
 els.guestLoginBtn.addEventListener('click', () => showAuthModal(true));
 els.navLogoutBtn.addEventListener('click', logout);
 els.navAddBtn.addEventListener('click', () => { resetForm(); openEditor(); });
+els.mobileFamilySettings.addEventListener('click', () => setMobileFamilySettingsOpen(true));
+els.mobileFamilySettingsClose.addEventListener('click', () => setMobileFamilySettingsOpen(false));
 els.closeAuthBtn.addEventListener('click', () => showAuthModal(false));
 els.loginBtn.addEventListener('click', () => handleAuth('/api/login'));
 els.registerBtn.addEventListener('click', () => handleAuth('/api/register'));
@@ -332,10 +377,19 @@ els.deleteBtn.addEventListener('click', deleteEntry);
 els.searchInput.addEventListener('input', () => feedController.scheduleRender());
 
 els.feedList.addEventListener('click', event => {
-  const button = event.target.closest('[data-edit-id]');
-  const state = feedController.currentState();
-  if (!button || !state) return;
-  const entry = (state.entries || []).find(item => item.id === Number(button.dataset.editId));
+  const openLink = event.target.closest('[data-open-post-id]');
+  if (openLink && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+    event.preventDefault();
+    postDetailController.openPublic(openLink.dataset.openPostId, { entry: feedController.findEntry(openLink.dataset.openPostId) });
+    return;
+  }
+  const shareButton = event.target.closest('[data-share-post-id]');
+  if (shareButton) {
+    postDetailController.share(feedController.findEntry(shareButton.dataset.sharePostId), shareButton);
+    return;
+  }
+  const editButton = event.target.closest('[data-edit-id]');
+  const entry = editButton ? feedController.findEntry(editButton.dataset.editId) : null;
   if (entry) fillForm(entry);
 });
 
@@ -347,14 +401,44 @@ bindBackdropDismiss(els.profileModal, profileController.close);
 bindBackdropDismiss(els.authModal, () => showAuthModal(false));
 
 kidsController.bindEvents();
+postDetailController.bindEvents();
 
 document.addEventListener('keydown', event => {
+  if (event.key === 'Tab' && els.feedSidebar.classList.contains('mobile-open')) {
+    const focusable = [...els.feedSidebar.querySelectorAll('button, input, select, textarea, a[href]')]
+      .filter(element => !element.disabled && element.getClientRects().length);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+    return;
+  }
   if (event.key === 'Escape') {
     if (els.confirmOverlay.classList.contains('active')) closeConfirm(false);
     else if (isEditorOpen()) closeEditor();
     else if (els.profileModal.style.display !== 'none') profileController.close();
     else if (els.authModal.style.display !== 'none') showAuthModal(false);
+    else if (els.feedSidebar.classList.contains('mobile-open')) setMobileFamilySettingsOpen(false);
   }
+});
+
+window.matchMedia('(max-width: 860px)').addEventListener('change', event => {
+  if (!event.matches) setMobileFamilySettingsOpen(false);
+});
+
+for (const eventName of ['resize', 'scroll']) {
+  window.visualViewport?.addEventListener(eventName, () => {
+    if (isEditorOpen()) syncEditorViewport();
+  });
+}
+window.addEventListener('resize', () => {
+  if (isEditorOpen()) syncEditorViewport();
 });
 
 resetForm();

@@ -1,7 +1,7 @@
 const db = require('./db');
 const { PORT } = require('./config');
 const { send } = require('./http');
-const { handlePublicPost, handleRobots, handleSitemap } = require('./public');
+const { handlePublicPost, handleRobots, handleSharedPost, handleSitemap } = require('./public');
 const { serveFile } = require('./static');
 const { createAdminHandlers } = require('./routes/admin');
 const { createEntryHandlers } = require('./routes/entries');
@@ -21,8 +21,12 @@ function createRequestHandler({ sseHub }) {
       return await (async () => {
       const url = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);
       const howler = url.pathname.match(/^\/api\/howlers\/(\d+)$/);
+      const howlerShare = url.pathname.match(/^\/api\/howlers\/(\d+)\/share$/);
+      const publicHowler = url.pathname.match(/^\/api\/public\/howlers\/(\d+)$/);
+      const sharedHowler = url.pathname.match(/^\/api\/shared\/([A-Za-z0-9_-]{32})$/);
       const kid = url.pathname.match(/^\/api\/kids\/(\d+)$/);
       const publicPost = url.pathname.match(/^\/posts\/(\d+)$/);
+      const sharedPost = url.pathname.match(/^\/shared\/([A-Za-z0-9_-]{32})$/);
       const invite = url.pathname.match(/^\/api\/family\/invites\/(\d+)(?:\/(accept))?$/);
       const adminEntry = url.pathname.match(/^\/api\/admin\/entries\/(\d+)$/);
       const adminUser = url.pathname.match(/^\/api\/admin\/users\/(\d+)(?:\/(sessions))?$/);
@@ -59,13 +63,25 @@ function createRequestHandler({ sseHub }) {
       if (invite && !invite[2] && req.method === 'DELETE') return families.cancelInvite(req, res, Number(invite[1]));
 
       if (req.method === 'POST' && url.pathname === '/api/howlers') return entries.create(req, res);
+      if (howlerShare && req.method === 'POST') return entries.share(req, res, Number(howlerShare[1]));
       if (howler && req.method === 'PUT') return entries.update(req, res, Number(howler[1]));
       if (howler && req.method === 'DELETE') return entries.remove(req, res, Number(howler[1]));
       if (req.method === 'GET' && url.pathname === '/api/feed') return send(res, 200, db.listPublicHowlers());
+      if (publicHowler && req.method === 'GET') {
+        const entry = db.getPublicHowler(Number(publicHowler[1]));
+        return entry ? send(res, 200, entry) : send(res, 404, { error: 'Записът не е намерен.' });
+      }
+      if (sharedHowler && req.method === 'GET') {
+        const entry = db.getSharedHowler(sharedHowler[1]);
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.setHeader('Referrer-Policy', 'no-referrer');
+        return entry ? send(res, 200, entry) : send(res, 404, { error: 'Записът не е намерен.' });
+      }
 
       if (req.method === 'GET' && url.pathname === '/sitemap.xml') return handleSitemap(req, res);
       if (req.method === 'GET' && url.pathname === '/robots.txt') return handleRobots(req, res);
       if (req.method === 'GET' && publicPost) return handlePublicPost(req, res, Number(publicPost[1]));
+      if (req.method === 'GET' && sharedPost) return handleSharedPost(req, res, sharedPost[1]);
       if (req.method === 'GET') {
         let pathname;
         try {

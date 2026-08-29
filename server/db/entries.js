@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const db = require('./connection');
 const { childNamesFromRow } = require('../child-names');
 const { buildMultiChildAgeNote } = require('../entry-ages');
@@ -37,7 +38,7 @@ function listHowlers(userId) {
   const familyId = getFamilyIdForUser(userId);
   const familyKids = listFamilyKids(familyId);
   return db.prepare(`SELECT * FROM howlers WHERE family_id = ?
-    ORDER BY COALESCE(NULLIF(happened_on, ''), '') DESC, updated_at DESC, id DESC`)
+    ORDER BY created_at DESC, id DESC`)
     .all(familyId).map(row => mapEntry(row, familyKids));
 }
 
@@ -78,7 +79,7 @@ function updateHowler(userId, howlerId, input) {
 function listPublicHowlers(limit) {
   const kidsByFamily = new Map();
   return db.prepare(`SELECT * FROM howlers WHERE is_public = 1
-    ORDER BY COALESCE(NULLIF(happened_on, ''), '') DESC, updated_at DESC, id DESC LIMIT ?`)
+    ORDER BY created_at DESC, id DESC LIMIT ?`)
     .all(limit || 60).map(row => {
       if (!kidsByFamily.has(row.family_id)) kidsByFamily.set(row.family_id, listFamilyKids(row.family_id));
       return { ...mapEntry(row, kidsByFamily.get(row.family_id)), tags: [] };
@@ -88,6 +89,40 @@ function listPublicHowlers(limit) {
 function getPublicHowler(id) {
   const row = db.prepare('SELECT * FROM howlers WHERE id = ? AND is_public = 1').get(id);
   return row ? { ...mapEntry(row, listFamilyKids(row.family_id)), tags: [] } : null;
+}
+
+function getSharedHowler(token) {
+  const cleanToken = String(token || '');
+  if (!/^[A-Za-z0-9_-]{32}$/.test(cleanToken)) return null;
+  const row = db.prepare('SELECT * FROM howlers WHERE share_token = ?').get(cleanToken);
+  return row ? { ...mapEntry(row, listFamilyKids(row.family_id)), tags: [] } : null;
+}
+
+function getSharePath(userId, howlerId) {
+  const familyId = getFamilyIdForUser(userId);
+  const row = db.prepare('SELECT id, is_public, share_token FROM howlers WHERE family_id = ? AND id = ?')
+    .get(familyId, howlerId);
+  if (!row) return null;
+  if (row.is_public === 1) return `/posts/${row.id}`;
+  if (row.share_token) return `/shared/${row.share_token}`;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const token = crypto.randomBytes(24).toString('base64url');
+    try {
+      const result = db.prepare(`UPDATE howlers SET share_token = ?
+        WHERE family_id = ? AND id = ? AND share_token IS NULL`)
+        .run(token, familyId, howlerId);
+      if (result.changes) return `/shared/${token}`;
+      const current = db.prepare('SELECT is_public, share_token FROM howlers WHERE family_id = ? AND id = ?')
+        .get(familyId, howlerId);
+      if (!current) return null;
+      if (current.is_public === 1) return `/posts/${howlerId}`;
+      if (current.share_token) return `/shared/${current.share_token}`;
+    } catch (error) {
+      if (!String(error.message).includes('UNIQUE')) throw error;
+    }
+  }
+  throw new Error('Връзката за споделяне не можа да бъде създадена.');
 }
 
 function deleteHowler(userId, howlerId) {
@@ -130,5 +165,5 @@ function getSummary(userId) {
 
 module.exports = {
   listHowlers, createHowler, updateHowler, deleteHowler, getSummary,
-  listPublicHowlers, getPublicHowler,
+  listPublicHowlers, getPublicHowler, getSharedHowler, getSharePath,
 };

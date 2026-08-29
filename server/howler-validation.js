@@ -21,7 +21,7 @@ function validateHowler(body) {
   if (normalizedChildren.error) return normalizedChildren;
   const { childNames } = normalizedChildren;
   const childName = childNames.join(', ');
-  const title = String(body.title || '').trim();
+  let title = String(body.title || '').trim();
   const hasCombinedContent = Object.prototype.hasOwnProperty.call(body, 'content');
   const content = String(body.content || '').trim();
   const quote = hasCombinedContent ? '' : String(body.quote || '').trim();
@@ -35,8 +35,9 @@ function validateHowler(body) {
   const isPublic = Boolean(body.isPublic);
   const tags = Array.isArray(body.tags) ? body.tags : String(body.tags || '').split(',');
 
+  if (!title && photo) title = 'Снимка';
   if (!title) return { error: 'Заглавието е задължително.' };
-  if (!quote && !story) return { error: 'Добави текст към записа.' };
+  if (!quote && !story && !photo) return { error: 'Добави текст или снимка към записа.' };
   if (title.length > 120) return { error: 'Заглавието е прекалено дълго.' };
   if (hasCombinedContent && content.length > 5000) return { error: 'Текстът на записа е прекалено дълъг.' };
   if (!hasCombinedContent && quote.length > 800) return { error: 'Репликата е прекалено дълга.' };

@@ -50,7 +50,19 @@ function createEntryHandlers({ sseHub }) {
     send(res, 200, { ok: true, state: buildState(session.user_id) });
   }
 
-  return { create, update, remove };
+  async function share(req, res, id) {
+    const session = await authenticate(req, res);
+    if (!session) return;
+    const path = db.getSharePath(session.user_id, id);
+    if (!path) {
+      send(res, 404, { error: 'Записът не е намерен.' });
+      return;
+    }
+    res.setHeader('Cache-Control', 'private, no-store');
+    send(res, 200, { path });
+  }
+
+  return { create, update, remove, share };
 }
 
 module.exports = { createEntryHandlers };

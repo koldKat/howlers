@@ -25,8 +25,8 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
   }
 
   function entryCard(entry, editable) {
-    const title = editable
-      ? `<a class="list-item-title public-entry-link" href="/posts/${entry.id}">${renderInlineContent(entry.title)}</a>`
+    const title = entry.isPublic
+      ? `<a class="list-item-title public-entry-link" data-open-post-id="${entry.id}" href="/posts/${entry.id}">${renderInlineContent(entry.title)}</a>`
       : `<div class="list-item-title">${renderInlineContent(entry.title)}</div>`;
     return `<article class="list-item">
       <div class="list-item-head">
@@ -38,7 +38,12 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
       ${editable ? `<div class="entry-meta">
         ${entry.isFavorite ? `<span class="tag-chip favorite-chip">${escapeHtml(t('tag_favorite'))}</span>` : ''}
         ${(entry.tags || []).map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join('')}
-      </div><div class="entry-actions"><button class="secondary-link" data-edit-id="${entry.id}">${escapeHtml(t('entry_edit_btn'))}</button></div>` : ''}
+      </div>` : ''}
+      <div class="entry-actions">
+        ${entry.isPublic ? `<a class="secondary-link" data-open-post-id="${entry.id}" href="/posts/${entry.id}">${escapeHtml(t('entry_open_btn'))}</a>` : ''}
+        <button class="secondary-link" data-share-post-id="${entry.id}">${escapeHtml(t('post_share_btn'))}</button>
+        ${editable ? `<button class="secondary-link" data-edit-id="${entry.id}">${escapeHtml(t('entry_edit_btn'))}</button>` : ''}
+      </div>
     </article>`;
   }
 
@@ -129,9 +134,17 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
     latestFeed = Array.isArray(entries) ? entries : [];
   }
 
+  function findEntry(id) {
+    const numericId = Number(id);
+    return (latestState?.entries || []).find(entry => entry.id === numericId)
+      || latestFeed.find(entry => entry.id === numericId)
+      || null;
+  }
+
   return {
     clearState: () => { latestState = null; },
     currentState: () => latestState,
+    findEntry,
     loadPublicFeed,
     render,
     renderPublicFeed: () => renderPublicFeed(latestFeed),

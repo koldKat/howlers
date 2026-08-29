@@ -62,7 +62,7 @@ Server composition:
 - `server/state.js`: authenticated and guest state builders
 - `server/sse.js`: live client registry and state publishing
 - `server/static.js`: static files under `public/`
-- `server/public.js`: public post HTML, sitemap, and robots output
+- `server/public.js`: public and private-link post HTML, sitemap, and robots output
 - `server/export.js`: TXT and print/PDF export rendering
 - `server/image-validation.js`: raster data URL size and signature checks
 - `server/howler-validation.js`: entry normalization and validation
@@ -86,6 +86,7 @@ Browser code:
 - `public/js/app/entry-presentation.js`: entry labels, metadata, inline formatting, and SVG emoticon rendering
 - `public/js/app/feed.js`: public and private feed rendering, filtering, and summary presentation
 - `public/js/app/feed-loading.js`: reusable feed-loader cloning and localized status updates
+- `public/js/app/post-detail.js`: public/private-link detail dialog, browser history, and Web Share integration
 - `public/js/app/format.js`: escaping, dates, and data URL sizing
 - `public/js/app/kids.js`: child-list rendering and child create/delete actions
 - `public/js/app/profile.js`: profile modal, avatars, passwords, exports, and family invitations
@@ -161,6 +162,7 @@ Important columns:
 - legacy `quote` plus current `story`
 - `photo`, `category`, `mood`, and `tags_json`
 - `is_favorite` and `is_public`
+- optional unique `share_token` for private link sharing
 - `created_at` and `updated_at`
 
 `child_names_json` stores the complete ordered child-name list. `child_name` remains populated with the first name for backward storage compatibility. Startup migration backfills existing rows as one-item lists. API objects expose `childNames` plus a compatibility `childName` label that joins all names with commas. Create and update requests accept `childNames`; requests using the former singular `childName` remain valid.
@@ -183,6 +185,7 @@ Authorization boundaries:
 - every family member can create, edit, and delete entries in that shared archive
 - public feed and public post routes expose only entries with `is_public = 1`
 - public entry objects replace tags with an empty array
+- private link routes require a valid random share token and also replace tags with an empty array
 - admin routes depend on localhost network origin, not a user role
 - `slanchoff` and `koldkat` cannot be deleted through the admin API
 
@@ -207,7 +210,10 @@ Tokens are stored in browser `localStorage`. Deployments should use HTTPS when a
 - `GET /api/state`: full authenticated application state
 - `GET /api/events`: guest or authenticated SSE stream
 - `GET /api/feed`: public entries without private tags
+- `GET /api/public/howlers/:id`: one public entry without private tags
+- `GET /api/shared/:token`: one link-shared entry without private tags
 - `GET /posts/:id`: server-rendered public entry or `404` for a private/missing entry
+- `GET /shared/:token`: server-rendered link-shared entry with `noindex` metadata
 - `GET /sitemap.xml`: root page plus up to 50,000 public entry URLs
 - `GET /robots.txt`: crawler rules and sitemap address
 
@@ -218,13 +224,16 @@ Authenticated state contains `app`, `viewer`, `profile`, `attention`, `summary`,
 - `POST /api/howlers`: creates an entry and returns `{ ok, entry, state }`
 - `PUT /api/howlers/:id`: replaces an entry and returns `{ ok, entry, state }`
 - `DELETE /api/howlers/:id`: deletes an entry and returns `{ ok, state }`
+- `POST /api/howlers/:id/share`: returns a public path or creates and returns a stable private share path
 - `GET /api/kids`: lists shared family children
 - `POST /api/kids`: creates a child and returns `{ ok, kid }`
 - `DELETE /api/kids/:id`: removes a child from the shared list
 
-Current entry input uses `childNames` and `content`. Legacy `childName`, `quote`, and `story` input remains accepted. Required values are at least one child name, a title, and non-empty text. Child names are deduplicated case-insensitively and a request may contain up to 20 names. Empty category and mood use `said` and `golden`; non-empty values must be in the fixed lists from `public/js/app/constants.js`.
+Current entry input uses `childNames` and `content`. Legacy `childName`, `quote`, and `story` input remains accepted. Every entry requires at least one child name and either non-empty text or a valid photo. A missing title is accepted for photo entries and normalized to `Снимка`. Child names are deduplicated case-insensitively and a request may contain up to 20 names. Empty category and mood use `said` and `golden`; non-empty values must be in the fixed lists from `public/js/app/constants.js`.
 
 New entries without `happenedOn` receive the server's current local date. Updates do not add a date to an intentionally undated old entry.
+
+Private and public feed queries sort by immutable `created_at DESC, id DESC`. `happened_on` is event metadata only and does not affect feed position. Updating an entry changes `updated_at` but does not move it to the top of the feed.
 
 ### Family invites
 
@@ -261,12 +270,14 @@ Server validation enforces:
 
 - one through 20 children per entry, deduplicated without regard to letter case
 - each child name up to 60 characters
-- title up to 120 characters
+- title up to 120 characters, with `Снимка` supplied for untitled photo entries
 - current combined content up to 5,000 characters
 - legacy quote up to 800 and story up to 4,000 characters
 - a real calendar date in `YYYY-MM-DD` form when present
 - fixed category and mood values
 - raster image MIME, decoded size, and matching file signature
+
+An entry must contain text or a photo. A valid photo-only entry may use any valid past date and does not require filler text.
 
 Tags are normalized by trimming, removing empty values and duplicates, and keeping at most eight.
 
@@ -303,7 +314,11 @@ Recovery is manual. Stop the server, preserve the current database files, extrac
 
 ## Public pages and SEO
 
-Public entry pages include canonical metadata, Open Graph fields, JSON-LD article data, and the shared app styling. Private or missing IDs return a small `noindex` 404 page.
+Public entry pages use `/posts/:id` and include canonical metadata, Open Graph fields, JSON-LD article data, and the normal application shell. Only public entries are included in the sitemap.
+
+Private entries are shared through `/shared/:token`. The token is 24 cryptographically random bytes encoded as a 32-character base64url value and protected by a partial unique database index. Conditional creation prevents simultaneous share requests from replacing a token that another request just returned. The token is created only by the authenticated share endpoint, remains stable for later shares, and is never included in state, feed, SSE, or sitemap payloads. The link is intentionally accessible without login to anyone who knows it. Both the HTML response header and page metadata mark it `noindex, nofollow`. The response also uses `Cache-Control: private, no-store` and `Referrer-Policy: no-referrer`; the JSON link endpoint and private-entry API are non-cacheable as well. `/shared/` is not blocked in `robots.txt`, because a crawler must be allowed to fetch the response before it can honor `noindex`. Private numeric `/posts/:id` routes still return `404`.
+
+The authenticated feed keeps a share action for private entries so a family member can create or reuse the token. Once `/shared/:token` is opened, the server renders the detail share control with `hidden`, and the client controller keeps it hidden based on the route kind. Public `/posts/:id` details retain the share action.
 
 The base URL is built from `X-Forwarded-Proto`, `X-Forwarded-Host`, or `Host`. A reverse proxy must provide trustworthy values so canonical and sitemap URLs are correct.
 
@@ -311,12 +326,23 @@ The base URL is built from `X-Forwarded-Proto`, `X-Forwarded-Host`, or `Host`. A
 
 The main client keeps token and UI state in module scope, renders escaped user text, and converts the supported lightweight formatting markers and emoticon tokens to safe HTML.
 
+Post bodies use justified alignment through the shared `.entry-content` rule, including feed cards, hydrated detail dialogs, and server-rendered detail content. `overflow-wrap: anywhere` protects narrow screens, while `hyphens: auto` can use the document's Bulgarian language metadata when supported by the browser.
+
 Modal dismissal accepts Escape, the close button, or an intentional click on the backdrop. Pointer dragging that starts inside a dialog does not dismiss it when released outside.
+
+The editor overlay follows `window.visualViewport.height` and `offsetTop`, updating on viewport resize and scroll. This avoids positioning the mobile sheet against the larger layout viewport while browser chrome or the software keyboard reduces the visible area. CSS `100dvh` is the fallback, safe-area insets pad the mobile overlay, body scrolling is locked while editing, and the editor header remains sticky inside its scroll container.
+
+The shared-post dialog keeps the entry title only inside the entry card. Its compact header contains the shared-post label and close control, avoiding a duplicate visible title. On narrow screens the family settings sheet receives dialog semantics, moves focus to its close control, traps keyboard focus while open, closes on Escape, and returns focus to its opener.
+
+Hydrated post details preserve the server view's semantic `h1`. Closing a direct detail route restores the root title, canonical link, description, and Open Graph metadata, and removes detail-only robots, referrer, and JSON-LD elements. Reopening the mobile editor resets its scroll container to the top before it becomes visible.
+
+Direct `/posts/:id` and `/shared/:token` responses mark their populated dialog with `data-server-rendered`. CSS fixes that dialog above the app with an opaque viewport-covering shadow before JavaScript runs. During boot, `openInitialRoute()` consumes the embedded entry immediately after localization and before authentication or feed loading. The main feed then hydrates behind the already visible modal, so a direct share hit presents the requested post first while retaining instant close-to-feed navigation.
 
 The CSS uses three responsive ranges:
 
 - up to 860 px: the layout becomes one column
 - up to 600 px: controls stack and editor/profile dialogs become bottom sheets
+- up to 860 px: family summary and child management move into a full-screen settings sheet opened from an SVG cog in the app header; its sticky close row and `z-index: 120` keep it above the `z-index: 100` navigation bar
 - up to 400 px: compact actions stack where necessary
 
 The background illustration is fixed to the viewport. Its doodles are aligned with the sky, sand, and grass color bands.
@@ -339,7 +365,7 @@ npm run docs:check
 npm run hooks:install
 ```
 
-`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, auth limits, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, photos, public feed, SEO routes, export, logout, and admin routes.
+`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, auth limits, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, photos, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and admin routes.
 
 `docs/*.md` files are the source of truth. `npm run docs:build` regenerates standalone HTML equivalents, while `npm run docs:html-check` fails if generated HTML is stale.
 
