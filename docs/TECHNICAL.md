@@ -85,7 +85,7 @@ Browser code:
 - `public/js/app/constants.js`: categories, moods, emoticons, formatting, and client upload limits
 - `public/js/app/dom.js`: DOM references and backdrop dismissal
 - `public/js/app/child-picker.js`: multi-child selection and age-note calculation
-- `public/js/app/editor-tools.js`: formatting, shortcuts, emoticons, photo processing, and editor controls
+- `public/js/app/editor-tools.js`: cursor-aware shared formatting and emoticon controls, shortcuts, photo processing, and editor controls
 - `public/js/app/entry-presentation.js`: entry labels, metadata, inline formatting, and SVG emoticon rendering
 - `public/js/app/feed.js`: public and private feed rendering, filtering, and summary presentation
 - `public/js/app/feed-loading.js`: reusable feed-loader cloning and localized status updates
@@ -300,6 +300,8 @@ Server validation enforces:
 - a real calendar date in `YYYY-MM-DD` form when present
 - fixed category and mood values
 - raster image MIME, decoded size, and matching file signature
+
+Entry validation errors include both `error` and a stable `field` name. The editor keeps the message in its bottom alert and applies `aria-invalid`, `aria-describedby`, and the red `editor-field-invalid` style to the matching control. Editing that control clears its visual error state and the stale message.
 
 An entry must contain text or a photo. A valid photo-only entry may use any valid past date and does not require filler text.
 

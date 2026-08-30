@@ -97,7 +97,7 @@ npm start</code></pre>
 <li><code>public/js/app/constants.js</code>: categories, moods, emoticons, formatting, and client upload limits</li>
 <li><code>public/js/app/dom.js</code>: DOM references and backdrop dismissal</li>
 <li><code>public/js/app/child-picker.js</code>: multi-child selection and age-note calculation</li>
-<li><code>public/js/app/editor-tools.js</code>: formatting, shortcuts, emoticons, photo processing, and editor controls</li>
+<li><code>public/js/app/editor-tools.js</code>: cursor-aware shared formatting and emoticon controls, shortcuts, photo processing, and editor controls</li>
 <li><code>public/js/app/entry-presentation.js</code>: entry labels, metadata, inline formatting, and SVG emoticon rendering</li>
 <li><code>public/js/app/feed.js</code>: public and private feed rendering, filtering, and summary presentation</li>
 <li><code>public/js/app/feed-loading.js</code>: reusable feed-loader cloning and localized status updates</li>
@@ -271,6 +271,7 @@ npm start</code></pre>
 <li>fixed category and mood values</li>
 <li>raster image MIME, decoded size, and matching file signature</li>
 </ul>
+<p>Entry validation errors include both <code>error</code> and a stable <code>field</code> name. The editor keeps the message in its bottom alert and applies <code>aria-invalid</code>, <code>aria-describedby</code>, and the red <code>editor-field-invalid</code> style to the matching control. Editing that control clears its visual error state and the stale message.</p>
 <p>An entry must contain text or a photo. A valid photo-only entry may use any valid past date and does not require filler text.</p>
 <p>Tags are normalized by trimming, removing empty values and duplicates, and keeping at most eight.</p>
 <h2>Live update model</h2>

@@ -87,6 +87,18 @@ input:focus, select:focus, textarea:focus {
   border-color: rgba(72, 191, 174, 0.6);
   box-shadow: 0 0 0 3px rgba(72, 191, 174, 0.16);
 }
+input.editor-field-invalid,
+select.editor-field-invalid,
+textarea.editor-field-invalid,
+.child-multi-picker.editor-field-invalid {
+  border-color: #cf3f5b;
+  box-shadow: 0 0 0 3px rgba(207, 63, 91, 0.16);
+}
+.post-photo-field.editor-field-invalid {
+  border-radius: 12px;
+  outline: 2px solid #cf3f5b;
+  outline-offset: 4px;
+}
 select {
   appearance: none;
   -webkit-appearance: none;

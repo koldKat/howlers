@@ -23,6 +23,10 @@ export async function apiFetch(url, options = {}) {
     ...options,
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Заявката е неуспешна.');
+  if (!response.ok) {
+    const error = new Error(data.error || 'Заявката е неуспешна.');
+    error.field = typeof data.field === 'string' ? data.field : '';
+    throw error;
+  }
   return data;
 }

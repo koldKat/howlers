@@ -12,7 +12,7 @@ import { dataUrlBytes, escapeHtml } from './format.js';
 
 export function createEditorTools(elements) {
   let postPhotoData = '';
-  let activeTextFormatFieldId = '';
+  let activeTextFormatFieldId = 'content';
   const textFormatSelections = new Map();
 
   function rememberSelection(target) {
@@ -57,17 +57,21 @@ export function createEditorTools(elements) {
     target.setSelectionRange(start, end);
   }
 
-  function toolbarTarget(toolbar) {
-    const fallback = document.getElementById(toolbar.dataset.formatTarget);
-    if (['title', 'content'].includes(document.activeElement?.id) && activeTextFormatFieldId) {
-      const target = document.getElementById(activeTextFormatFieldId);
-      const selection = textFormatSelections.get(activeTextFormatFieldId);
-      if (target && selection && selection.start !== selection.end) {
-        restoreSelection(target, selection);
-        return target;
-      }
+  function activeTextTarget(fallbackId = 'content') {
+    const target = document.getElementById(activeTextFormatFieldId)
+      || document.getElementById(fallbackId);
+    const selection = textFormatSelections.get(target?.id);
+    if (target && selection) restoreSelection(target, selection);
+    return target;
+  }
+
+  function resetTextTarget() {
+    activeTextFormatFieldId = 'content';
+    textFormatSelections.clear();
+    const target = document.getElementById(activeTextFormatFieldId);
+    if (target) {
+      textFormatSelections.set(target.id, { start: target.value.length, end: target.value.length });
     }
-    return fallback;
   }
 
   function handleShortcut(event) {
@@ -190,7 +194,7 @@ export function createEditorTools(elements) {
     });
     toolbar.addEventListener('click', event => {
       const button = event.target.closest('[data-text-format]');
-      if (button) toggleTextFormat(toolbarTarget(toolbar), button.dataset.textFormat);
+      if (button) toggleTextFormat(activeTextTarget(toolbar.dataset.formatTarget), button.dataset.textFormat);
     });
   });
   ['title', 'content'].forEach(id => {
@@ -209,13 +213,14 @@ export function createEditorTools(elements) {
     });
     picker.addEventListener('click', event => {
       const button = event.target.closest('[data-inline-emoticon]');
-      if (button) insertEmoticon(document.getElementById(picker.dataset.emoteTarget), button.dataset.inlineEmoticon);
+      if (button) insertEmoticon(activeTextTarget(picker.dataset.emoteTarget), button.dataset.inlineEmoticon);
     });
   });
 
   return {
     getPhoto: () => postPhotoData,
     initializeControls,
+    resetTextTarget,
     setPhoto,
   };
 }

@@ -112,6 +112,7 @@ export function getAppElements() {
     category:      document.getElementById('category'),
     mood:          document.getElementById('mood'),
     content:       document.getElementById('content'),
+    postPhotoField: document.getElementById('post-photo-field'),
     postPhotoInput: document.getElementById('post-photo-input'),
     postPhotoPreview: document.getElementById('post-photo-preview'),
     postPhotoStatus: document.getElementById('post-photo-status'),

@@ -109,6 +109,7 @@ function closeEditor() {
   els.editorOverlay.classList.remove('active');
   document.body.classList.remove('editor-open');
   els.formError.textContent = '';
+  clearEditorValidation();
 }
 
 function setEditorAdvancedOpen(open) {
@@ -129,6 +130,37 @@ function hasAdvancedEntryData(entry) {
     entry.isFavorite ||
     entry.isPublic
   );
+}
+
+const editorValidationFields = {
+  children: [els.childSelect, els.childName],
+  title: [els.title],
+  content: [els.content],
+  photo: [els.postPhotoField],
+  date: [els.happenedOn],
+  category: [els.category],
+  mood: [els.mood],
+};
+
+function clearEditorValidation(field = '') {
+  const controls = field
+    ? editorValidationFields[field] || []
+    : Object.values(editorValidationFields).flat();
+  controls.forEach(control => {
+    control.classList.remove('editor-field-invalid');
+    control.removeAttribute('aria-invalid');
+    control.removeAttribute('aria-describedby');
+  });
+}
+
+function markEditorValidationError(field) {
+  const controls = editorValidationFields[field] || [];
+  controls.forEach(control => {
+    control.classList.add('editor-field-invalid');
+    control.setAttribute('aria-invalid', 'true');
+    control.setAttribute('aria-describedby', 'form-error');
+  });
+  if (['date', 'category', 'mood'].includes(field)) setEditorAdvancedOpen(true);
 }
 
 // ── Form ─────────────────────────────────────────────────────
@@ -156,6 +188,7 @@ function resetForm() {
   els.category.value = '';
   els.mood.value = '';
   els.content.value = '';
+  editorTools.resetTextTarget();
   editorTools.setPhoto('');
   childPicker.reset();
   els.tags.value = '';
@@ -165,6 +198,7 @@ function resetForm() {
   els.editorKicker.textContent = t('editor_kicker_new');
   els.deleteBtn.style.display = 'none';
   els.formError.textContent = '';
+  clearEditorValidation();
   setEditorAdvancedOpen(false);
 }
 
@@ -177,6 +211,7 @@ function fillForm(entry) {
   els.category.value = entry.category || '';
   els.mood.value = entry.mood || '';
   els.content.value = entry.content || [entry.quote, entry.story].filter(Boolean).join('\n\n');
+  editorTools.resetTextTarget();
   editorTools.setPhoto(entry.photo || '');
   childPicker.setAgeNote(entry.ageNote || '');
   els.tags.value = (entry.tags || []).join(', ');
@@ -188,6 +223,7 @@ function fillForm(entry) {
     .join(' \u2022 ');
   els.deleteBtn.style.display = 'inline-flex';
   els.formError.textContent = '';
+  clearEditorValidation();
   setEditorAdvancedOpen(hasAdvancedEntryData(entry));
   openEditor();
 }
@@ -286,6 +322,7 @@ async function becomeGuest() {
 
 async function saveEntry() {
   els.formError.textContent = '';
+  clearEditorValidation();
   const id = els.entryId.value;
   try {
     const result = await apiFetch(id ? `/api/howlers/${id}` : '/api/howlers', {
@@ -297,6 +334,7 @@ async function saveEntry() {
     closeEditor();
   } catch (error) {
     els.formError.textContent = error.message;
+    markEditorValidationError(error.field);
   }
 }
 
@@ -390,7 +428,7 @@ els.confirmOk.addEventListener('click', () => closeConfirm(true));
 bindBackdropDismiss(els.confirmOverlay, () => closeConfirm(false));
 bindBackdropDismiss(els.editorOverlay, closeEditor);
 bindBackdropDismiss(els.profileModal, profileController.close);
-bindBackdropDismiss(els.authModal, () => showAuthModal(false));
+bindBackdropDismiss(els.authModal, authController.close);
 
 kidsController.bindEvents();
 postDetailController.bindEvents();
@@ -415,7 +453,7 @@ document.addEventListener('keydown', event => {
     if (els.confirmOverlay.classList.contains('active')) closeConfirm(false);
     else if (isEditorOpen()) closeEditor();
     else if (els.profileModal.style.display !== 'none') profileController.close();
-    else if (els.authModal.style.display !== 'none') showAuthModal(false);
+    else if (els.authModal.style.display !== 'none') authController.close();
     else if (els.feedSidebar.classList.contains('mobile-open')) setMobileFamilySettingsOpen(false);
   }
 });
@@ -431,6 +469,20 @@ for (const eventName of ['resize', 'scroll']) {
 }
 window.addEventListener('resize', () => {
   if (isEditorOpen()) syncEditorViewport();
+});
+
+Object.entries(editorValidationFields).forEach(([field, controls]) => {
+  controls.forEach(control => {
+    const eventName = control.matches('select, input[type="date"], input[type="checkbox"]') ? 'change' : 'input';
+    control.addEventListener(eventName, () => {
+      clearEditorValidation(field);
+      els.formError.textContent = '';
+    });
+  });
+});
+els.removePostPhotoBtn.addEventListener('click', () => {
+  clearEditorValidation('photo');
+  els.formError.textContent = '';
 });
 
 resetForm();

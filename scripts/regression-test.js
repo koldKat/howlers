@@ -152,6 +152,7 @@ async function main() {
   assert.match(result.body, /\.post-detail-footer:has\(#post-detail-share\[hidden\]\):has\(\.post-detail-share-status:empty\)/);
   assert.doesNotMatch(result.body, /\.post-detail-dialog\s*\{\s*width:\s*100vw;\s*height:\s*100dvh;/);
   assert.match(result.body, /\.entry-content\s*\{[\s\S]*text-align: justify/);
+  assert.match(result.body, /input\.editor-field-invalid[\s\S]*border-color:\s*#cf3f5b/);
   assert.match(result.body, /#mobile-family-settings,\s*\.mobile-sidebar-head\s*\{ display: none; \}/);
   assert.match(result.body, /@media \(max-width: 860px\)[\s\S]*#mobile-family-settings\s*\{ display: inline-flex; \}/);
 
@@ -197,6 +198,10 @@ async function main() {
   assert.match(result.body, /<meta name="theme-color" content="#57b9ff">/);
   assert.match(result.body, /class="feed-loading" role="status" aria-live="polite"/);
   assert.match(result.body, /class="panel-head editor-dialog-head"/);
+  assert.equal((result.body.match(/class="text-format-toolbar"/g) || []).length, 1);
+  assert.equal((result.body.match(/class="inline-emote-picker"/g) || []).length, 1);
+  assert.doesNotMatch(result.body, /data-format-target="title"|data-emote-target="title"/);
+  assert.match(result.body, /id="form-error" class="inline-error" role="alert" aria-live="assertive"/);
   assert.equal((result.body.match(/class="feed-loading-spoke feed-loading-spoke-\d"/g) || []).length, 4);
   assert.match(result.body, /feed-loading-spoke-1[^>]*><path d="M32 7\.5v9" \/><path d="M32 47\.5v9"/);
 
@@ -209,6 +214,17 @@ async function main() {
   assert.equal(result.status, 200);
   assert.match(result.body, /\/api\/password-reset\/request/);
   assert.match(result.body, /history\.replaceState/);
+
+  result = await request('/js/app/editor-tools.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /function activeTextTarget/);
+  assert.match(result.body, /activeTextFormatFieldId = 'content'/);
+  assert.match(result.body, /insertEmoticon\(activeTextTarget\(picker\.dataset\.emoteTarget\)/);
+
+  result = await request('/js/app.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /markEditorValidationError\(error\.field\)/);
+  assert.doesNotMatch(result.body, /showAuthModal/);
 
   result = await request('/css/style.css', { raw: true });
   assert.equal(result.status, 200);
@@ -391,6 +407,16 @@ async function main() {
   });
   assert.equal(result.status, 400);
   assert.equal(result.body.error, 'Избери поне едно дете.');
+  assert.equal(result.body.field, 'children');
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({ title: '' }),
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Заглавието е задължително.');
+  assert.equal(result.body.field, 'title');
 
   result = await request('/api/howlers', {
     token: alpha,
@@ -470,6 +496,7 @@ async function main() {
   });
   assert.equal(result.status, 400);
   assert.equal(result.body.error, 'Добави текст или снимка към записа.');
+  assert.equal(result.body.field, 'content');
 
   result = await request('/api/howlers', {
     token: alpha,

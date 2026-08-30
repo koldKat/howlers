@@ -295,8 +295,6 @@
         <label class="wide">
           <span data-i18n="form_label_title">Заглавие</span>
           <input type="text" id="title" data-i18n-placeholder="placeholder_title" placeholder="Луната ни следва до вкъщи">
-          <div class="text-format-toolbar" data-format-target="title" aria-label="Форматиране на заглавието"></div>
-          <div class="inline-emote-picker" data-emote-target="title" aria-label="Добави емотикон в заглавието"></div>
         </label>
         <label class="wide">
           <span data-i18n="form_label_content">Запис</span>
@@ -304,7 +302,7 @@
           <div class="text-format-toolbar" data-format-target="content" aria-label="Форматиране на записа"></div>
           <div class="inline-emote-picker" data-emote-target="content" aria-label="Добави емотикон в записа"></div>
         </label>
-        <div class="wide post-photo-field">
+        <div id="post-photo-field" class="wide post-photo-field">
           <span class="post-photo-label" data-i18n="form_label_photo">Снимка</span>
           <div class="post-photo-actions">
             <label for="post-photo-input" class="ghost-btn small-btn post-photo-upload" data-i18n="post_photo_choose">Добави снимка</label>
@@ -367,7 +365,7 @@
         <button id="reset-btn" class="ghost-btn" type="button" data-i18n="reset_btn">Изчисти</button>
         <button id="delete-btn" class="ghost-btn danger-btn" type="button" style="display:none" data-i18n="delete_btn">Изтрий</button>
       </div>
-      <div id="form-error" class="inline-error"></div>
+      <div id="form-error" class="inline-error" role="alert" aria-live="assertive"></div>
     </div>
   </div>
 

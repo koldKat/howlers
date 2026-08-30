@@ -11,7 +11,7 @@ function createEntryHandlers({ sseHub }) {
     if (!session) return;
     const parsed = validateHowler(await readBody(req));
     if (parsed.error) {
-      send(res, 400, { error: parsed.error });
+      send(res, 400, { error: parsed.error, field: parsed.field });
       return;
     }
     const entry = db.createHowler(session.user_id, {
@@ -27,7 +27,7 @@ function createEntryHandlers({ sseHub }) {
     if (!session) return;
     const parsed = validateHowler(await readBody(req));
     if (parsed.error) {
-      send(res, 400, { error: parsed.error });
+      send(res, 400, { error: parsed.error, field: parsed.field });
       return;
     }
     const entry = db.updateHowler(session.user_id, id, parsed);
