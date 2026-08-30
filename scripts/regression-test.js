@@ -145,6 +145,10 @@ async function main() {
   assert.match(result.body, /--editor-viewport-height/);
   assert.match(result.body, /\.editor-dialog-head\s*\{[\s\S]*position: sticky/);
   assert.match(result.body, /\.post-detail-dialog\[data-server-rendered\]\[open\]/);
+  assert.match(result.body, /\.post-detail-dialog\[data-server-rendered\]\[open\]\s*\{[\s\S]*?top:\s*50%[\s\S]*?transform:\s*translate\(-50%,\s*-50%\)/);
+  assert.match(result.body, /\.post-detail-dialog\s*\{[\s\S]*?height:\s*fit-content/);
+  assert.match(result.body, /\.post-detail-footer:has\(#post-detail-share\[hidden\]\):has\(\.post-detail-share-status:empty\)/);
+  assert.doesNotMatch(result.body, /\.post-detail-dialog\s*\{\s*width:\s*100vw;\s*height:\s*100dvh;/);
   assert.match(result.body, /\.entry-content\s*\{[\s\S]*text-align: justify/);
   assert.match(result.body, /#mobile-family-settings,\s*\.mobile-sidebar-head\s*\{ display: none; \}/);
   assert.match(result.body, /@media \(max-width: 860px\)[\s\S]*#mobile-family-settings\s*\{ display: inline-flex; \}/);
@@ -173,11 +177,11 @@ async function main() {
   assert.match(manifestResponse.headers.get('content-type') || '', /^application\/manifest\+json/);
   const manifest = await manifestResponse.json();
   assert.equal(manifest.display, 'standalone');
-  assert.equal(manifest.background_color, '#111111');
-  assert.equal(manifest.theme_color, '#111111');
+  assert.equal(manifest.background_color, '#fff6dc');
+  assert.equal(manifest.theme_color, '#57b9ff');
   assert.deepEqual(manifest.icons.map(icon => icon.purpose), ['any', 'any maskable', 'any maskable']);
 
-  const iconResponse = await fetch(`${baseUrl}/icons/app-icon-maskable-192.png`);
+  const iconResponse = await fetch(`${baseUrl}/icons/app-icon-sky-192.png`);
   assert.equal(iconResponse.status, 200);
   assert.equal(iconResponse.headers.get('content-type'), 'image/png');
   const iconBytes = Buffer.from(await iconResponse.arrayBuffer());
@@ -187,7 +191,8 @@ async function main() {
   result = await request('/', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, /<link rel="manifest" href="\/site\.webmanifest">/);
-  assert.match(result.body, /<link rel="apple-touch-icon" sizes="180x180" href="\/icons\/apple-touch-icon\.png">/);
+  assert.match(result.body, /<link rel="apple-touch-icon" sizes="180x180" href="\/icons\/apple-touch-icon-sky\.png">/);
+  assert.match(result.body, /<meta name="theme-color" content="#57b9ff">/);
   assert.match(result.body, /class="feed-loading" role="status" aria-live="polite"/);
   assert.match(result.body, /class="panel-head editor-dialog-head"/);
   assert.equal((result.body.match(/class="feed-loading-spoke feed-loading-spoke-\d"/g) || []).length, 4);
