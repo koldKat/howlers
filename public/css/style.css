@@ -651,6 +651,21 @@ body.post-detail-open { overflow: hidden; }
 .auth-card h1 { font-size: clamp(1.3rem, 2vw, 1.8rem); letter-spacing: -0.03em; }
 .auth-copy { margin-top: 0.4rem; color: var(--muted); line-height: 1.45; font-size: 0.9rem; }
 .auth-form { display: grid; gap: 0.55rem; margin-top: 0.65rem; }
+.auth-form[hidden], .auth-field[hidden], .auth-mode-tabs[hidden] { display: none !important; }
+.auth-mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; margin-top: 0.7rem; }
+.auth-mode-tabs .is-active { background: rgba(255, 171, 53, 0.2); border-color: rgba(255, 127, 97, 0.42); }
+.auth-field { display: grid; gap: 0.25rem; color: var(--muted); font-size: 0.75rem; font-weight: 700; }
+.auth-link-btn {
+  border: 0;
+  padding: 0.45rem 0.2rem;
+  background: transparent;
+  color: #376d84;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+.auth-link-btn:hover { color: #c65f42; }
+.inline-success { min-height: 1em; color: #26705f; font-size: 0.82rem; font-weight: 700; line-height: 1.4; }
 
 /* ── Editor form ── */
 .editor-intro {

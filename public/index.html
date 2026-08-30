@@ -212,15 +212,48 @@
       <p class="eyebrow" data-i18n="auth_eyebrow">Личен дневник</p>
       <h1 data-i18n="app_name">Семейни бисери</h1>
       <p class="auth-copy" data-i18n="auth_copy">Записвайте случайните реплики, малките катастрофи и легендарните моменти, преди да изчезнат.</p>
-      <div class="auth-form">
-        <input type="text" id="auth-username" maxlength="60" placeholder="Потребителско име" autocomplete="username">
-        <input type="password" id="auth-password" maxlength="256" placeholder="Парола" autocomplete="current-password">
+      <div id="auth-mode-tabs" class="auth-mode-tabs">
+        <button id="auth-login-mode" class="ghost-btn is-active" type="button" data-i18n="login_btn">Вход</button>
+        <button id="auth-register-mode" class="ghost-btn" type="button" data-i18n="register_btn">Регистрация</button>
+      </div>
+      <form id="auth-main-form" class="auth-form" novalidate>
+        <input type="text" id="auth-username" maxlength="60" data-i18n-placeholder="auth_username" placeholder="Потребителско име" autocomplete="username">
+        <label id="auth-email-label" class="auth-field" hidden>
+          <span data-i18n="auth_email_optional">Имейл (незадължително)</span>
+          <input type="email" id="auth-email" maxlength="254" placeholder="name@example.com" autocomplete="email">
+        </label>
+        <input type="password" id="auth-password" maxlength="256" data-i18n-placeholder="auth_password" placeholder="Парола" autocomplete="current-password">
+        <label id="auth-confirm-label" class="auth-field" hidden>
+          <span data-i18n="auth_confirm_password">Потвърди паролата</span>
+          <input type="password" id="auth-password-confirm" maxlength="256" autocomplete="new-password">
+        </label>
         <div id="auth-error" class="inline-error"></div>
         <div class="actions-row auth-actions">
-          <button id="login-btn" class="primary-btn" data-i18n="login_btn">Вход</button>
-          <button id="register-btn" class="ghost-btn" data-i18n="register_btn">Регистрация</button>
+          <button id="auth-submit" class="primary-btn" type="submit" data-i18n="login_btn">Вход</button>
+          <button id="forgot-password-btn" class="auth-link-btn" type="button" data-i18n="auth_forgot_password">Забравена парола?</button>
         </div>
-      </div>
+      </form>
+      <form id="password-reset-request-form" class="auth-form" hidden novalidate>
+        <p class="auth-copy" data-i18n="auth_reset_request_copy">Въведи потребителско име или имейл и ще изпратим еднократна връзка.</p>
+        <input type="text" id="password-reset-identity" maxlength="254" autocomplete="username email" data-i18n-placeholder="auth_username_or_email" placeholder="Потребителско име или имейл">
+        <div id="password-reset-request-error" class="inline-error"></div>
+        <div id="password-reset-request-success" class="inline-success" role="status" aria-live="polite"></div>
+        <div class="actions-row auth-actions">
+          <button id="password-reset-request-submit" class="primary-btn" type="submit" data-i18n="auth_send_reset">Изпрати връзка</button>
+          <button class="auth-link-btn" type="button" data-auth-back data-i18n="auth_back_to_login">Обратно към входа</button>
+        </div>
+      </form>
+      <form id="password-reset-complete-form" class="auth-form" hidden novalidate>
+        <p class="auth-copy" data-i18n="auth_reset_complete_copy">Избери нова парола за профила си.</p>
+        <input type="password" id="password-reset-new" maxlength="256" autocomplete="new-password" data-i18n-placeholder="auth_new_password" placeholder="Нова парола">
+        <input type="password" id="password-reset-confirm" maxlength="256" autocomplete="new-password" data-i18n-placeholder="auth_confirm_new_password" placeholder="Потвърди новата парола">
+        <div id="password-reset-complete-error" class="inline-error"></div>
+        <div id="password-reset-complete-success" class="inline-success" role="status" aria-live="polite"></div>
+        <div class="actions-row auth-actions">
+          <button id="password-reset-complete-submit" class="primary-btn" type="submit" data-i18n="auth_set_password">Смени паролата</button>
+          <button class="auth-link-btn" type="button" data-auth-back data-i18n="auth_back_to_login">Обратно към входа</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -380,6 +413,10 @@
         <label class="profile-field">
           <span data-i18n="profile_username_label">Потребителско име</span>
           <input type="text" id="profile-username-ro" readonly>
+        </label>
+        <label class="profile-field">
+          <span data-i18n="profile_email_label">Имейл за възстановяване</span>
+          <input type="email" id="profile-email" maxlength="254" autocomplete="email" data-i18n-placeholder="profile_email_placeholder" placeholder="name@example.com">
         </label>
         <div id="profile-identity-error" class="inline-error"></div>
         <div class="actions-row">

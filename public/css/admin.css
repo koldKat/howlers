@@ -207,6 +207,29 @@ button, input { font: inherit; cursor: pointer; }
   outline: none;
 }
 .admin-search:focus { border-color: rgba(72,191,174,0.6); box-shadow: 0 0 0 3px rgba(72,191,174,0.14); }
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px 14px 14px;
+}
+.admin-form-grid label { display: grid; gap: 4px; color: var(--muted); font-size: 0.72rem; font-weight: 700; }
+.admin-form-grid input,
+.admin-form-grid select {
+  min-width: 0;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,253,247,0.98);
+  color: var(--text);
+}
+.admin-form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.admin-form-actions [role="status"] { margin-right: auto; color: var(--muted); font-size: 0.8rem; }
+.pill-locked { color: #8b2f2f; background: rgba(255, 127, 97, 0.16); border-color: rgba(194, 69, 69, 0.3); }
+
+@media (max-width: 760px) {
+  .admin-form-grid { grid-template-columns: 1fr; }
+}
 
 /* ── Stats ── */
 .stat-row {

@@ -60,6 +60,23 @@ function getAdminUser(id) {
 
 function adminClearUserSessions(userId) { db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId); }
 
+function adminSetUserLocked(userId, locked) {
+  const user = getAdminUser(userId);
+  if (!user) return null;
+  if (['slanchoff', 'koldkat'].includes(String(user.username || '').toLowerCase())) {
+    const error = new Error('Този администратор е защитен и не може да бъде заключен.');
+    error.statusCode = 403;
+    throw error;
+  }
+  const shouldLock = Boolean(locked);
+  db.transaction(() => {
+    db.prepare('UPDATE users SET locked_until = ?, failed_login_attempts = 0 WHERE id = ?')
+      .run(shouldLock ? -1 : null, user.id);
+    if (shouldLock) db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
+  })();
+  return { id: user.id, username: user.username, locked: shouldLock };
+}
+
 function adminVacuum() {
   db.exec('VACUUM');
   db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
@@ -72,7 +89,8 @@ function createBackup(targetPath) {
 }
 
 function listAdminUsers() {
-  return db.prepare(`SELECT u.id, u.username, u.locale, u.created_at, COUNT(h.id) AS entry_count,
+  return db.prepare(`SELECT u.id, u.username, u.locale, u.created_at, u.locked_until,
+    u.failed_login_attempts, COUNT(h.id) AS entry_count,
     SUM(CASE WHEN h.is_public = 1 THEN 1 ELSE 0 END) AS public_count,
     SUM(CASE WHEN h.is_favorite = 1 THEN 1 ELSE 0 END) AS favorite_count,
     MAX(h.updated_at) AS last_entry_at,
@@ -86,10 +104,15 @@ function listAdminUsers() {
       lastEntryAt: row.last_entry_at ? Number(row.last_entry_at) : null,
       sessionCount: Number(row.session_count || 0),
       isProtected: ['slanchoff', 'koldkat'].includes(String(row.username || '').toLowerCase()),
+      lockedUntil: row.locked_until == null ? null : Number(row.locked_until),
+      failedLoginAttempts: Number(row.failed_login_attempts || 0),
+      isLocked: Number(row.locked_until) === -1 || Number(row.locked_until) > Math.floor(Date.now() / 1000),
+      isManualLock: Number(row.locked_until) === -1,
     }));
 }
 
 module.exports = {
   getAdminStats, listAdminUsers, listAdminEntries, adminDeleteEntry, adminToggleEntryPublic,
-  adminDeleteUser, getAdminUser, adminClearUserSessions, adminVacuum, createBackup,
+  adminDeleteUser, getAdminUser, adminClearUserSessions, adminSetUserLocked,
+  adminVacuum, createBackup,
 };

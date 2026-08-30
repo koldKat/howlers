@@ -103,14 +103,35 @@
               <th>Любими</th>
               <th>Последен запис</th>
               <th>Сесии</th>
+              <th>Достъп</th>
               <th>Действия</th>
             </tr>
           </thead>
           <tbody id="users-body">
-            <tr><td colspan="10" class="loading-cell">Зареждане...</td></tr>
+            <tr><td colspan="11" class="loading-cell">Зареждане...</td></tr>
           </tbody>
         </table>
       </div>
+    </section>
+
+    <section class="admin-section" id="section-mail">
+      <div class="section-head-row">
+        <h2 class="section-heading">Имейл и възстановяване на парола</h2>
+        <span id="mail-status" class="pill pill-private">Не е настроен</span>
+      </div>
+      <form id="mail-settings-form" class="admin-form-grid">
+        <label><span>SMTP сървър</span><input name="host" required placeholder="mail.spacemail.com" autocomplete="off"></label>
+        <label><span>Порт</span><input name="port" type="number" min="1" max="65535" required value="465"></label>
+        <label><span>Сигурност</span><select name="security"><option value="tls">TLS (порт 465)</option><option value="starttls">STARTTLS (порт 587)</option><option value="none">Без транспортно криптиране</option></select></label>
+        <label><span>Потребител</span><input name="username" autocomplete="username"></label>
+        <label><span>SMTP парола</span><input name="password" type="password" autocomplete="new-password" placeholder="Празно поле запазва текущата"></label>
+        <label><span>Подател</span><input name="sender" type="email" required placeholder="admin@example.com"></label>
+        <div class="admin-form-actions">
+          <span id="mail-result" role="status" aria-live="polite"></span>
+          <button id="mail-test-btn" class="admin-action-btn" type="button">Изпрати тест</button>
+          <button class="admin-action-btn admin-action-btn--primary" type="submit">Запази SMTP</button>
+        </div>
+      </form>
     </section>
 
   </main>

@@ -37,8 +37,9 @@ Environment variables:
 - `PORT`: listener port, default `3019`
 - `DATABASE_PATH`: absolute path or a path resolved from the process working directory, default `database.sqlite` in the repository root
 - `DISABLE_BACKUPS=1`: disables backup scheduling
+- `PUBLIC_URL`: trusted origin used in password-reset links, default `https://biseri.net`
 
-The server binds through `server.listen(PORT)` and is therefore reachable on the interfaces selected by Node.js for the host. The admin routes still enforce a localhost remote address.
+The server binds through `server.listen(PORT)` and is therefore reachable on the interfaces selected by Node.js for the host. Admin routes require a localhost socket and reject requests carrying `Forwarded`, `X-Forwarded-*`, or `X-Real-IP`.
 
 ## Repository layout
 
@@ -51,10 +52,12 @@ Server composition:
 - `server/date-validation.js`: shared local date formatting and real calendar date validation
 - `server/entry-ages.js`: backward-compatible per-child age snapshots for multi-child entries
 - `server/auth.js`: authenticated session guard
+- `server/auth-rate-limit.js`: process-local failed-authentication window by client IP
+- `server/mailer.js`: SMTP settings, validation, encoded multipart message generation, bounded connections, and TLS delivery
 - `server/db.js`: stable persistence facade used by routes and services
 - `server/db/connection.js`: SQLite connection and startup initialization
 - `server/db/schema.js`: idempotent schema creation, migrations, and family bootstrap
-- `server/db/accounts.js`: credentials, sessions, viewer data, and profile persistence
+- `server/db/accounts.js`: credentials, email, lockouts, reset tokens, sessions, viewer data, and profile persistence
 - `server/db/families.js`: family membership, invitations, merges, and children
 - `server/db/entries.js`: entry queries, writes, mapping, and summaries
 - `server/db/admin.js`: admin reports, mutations, maintenance, and backup snapshots
@@ -67,7 +70,7 @@ Server composition:
 - `server/image-validation.js`: raster data URL size and signature checks
 - `server/howler-validation.js`: entry normalization and validation
 - `server/backup.js`: hourly ZIP creation and 14-day retention
-- `server/routes/session.js`: registration, login, logout, state, export, and SSE handlers
+- `server/routes/session.js`: registration, login, password reset, logout, state, export, and SSE handlers
 - `server/routes/profile.js`: profile, avatar, and password handlers
 - `server/routes/families.js`: child and family-invitation handlers
 - `server/routes/entries.js`: entry create, update, and delete handlers
@@ -86,6 +89,7 @@ Browser code:
 - `public/js/app/entry-presentation.js`: entry labels, metadata, inline formatting, and SVG emoticon rendering
 - `public/js/app/feed.js`: public and private feed rendering, filtering, and summary presentation
 - `public/js/app/feed-loading.js`: reusable feed-loader cloning and localized status updates
+- `public/js/app/auth.js`: login, registration, forgot-password, and reset-password controller
 - `public/js/app/post-detail.js`: public/private-link detail dialog, browser history, and Web Share integration
 - `public/js/app/format.js`: escaping, dates, and data URL sizing
 - `public/js/app/kids.js`: child-list rendering and child create/delete actions
@@ -127,6 +131,8 @@ The database connection module enables WAL mode and foreign keys at startup, the
 - `locale`, currently normalized to `bg`
 - optional `display_name`
 - optional `avatar` data URL
+- optional case-insensitively unique `email`
+- `failed_login_attempts` and optional `locked_until`; `-1` represents an indefinite admin lock
 
 Avatars must be JPEG, PNG, WebP, or GIF and decode to no more than 300 KiB.
 
@@ -148,6 +154,12 @@ Accepting an invite runs in a transaction. It moves the invitee family's entries
 - `last_active_at`
 
 `getSession()` updates `last_active_at`. At server startup, sessions inactive for more than seven days are purged. Session deletion is also used by logout and admin session clearing.
+
+### `password_reset_tokens` and `mail_settings`
+
+Reset rows store a SHA-256 token hash, user, expiry, optional use time, and creation time. Raw 256-bit reset tokens exist only in the generated email link. Tokens expire after one hour and are one-time use.
+
+`mail_settings` contains one row with SMTP host, port, `tls`, `starttls`, or `none` security, username, password, sender, and update time. Admin responses expose only `hasPassword`, never the password value.
 
 ### `kids`
 
@@ -177,6 +189,12 @@ Entry photos use allowlisted raster data URLs and decode to no more than 512 KiB
 
 Passwords are hashed with `crypto.scrypt` and a random per-user salt. Session tokens are 32 random bytes encoded as hexadecimal.
 
+Five consecutive incorrect passwords temporarily lock a normal account for 15 minutes. Successful authentication or admin unlock clears the account counter. A process-local IP throttle blocks subsequent login or registration requests after eight failures within 15 minutes and is cleared by successful authentication. Forwarded addresses are trusted only when the immediate peer is localhost; when local Nginx appends a chain, the throttle uses its last address rather than a client-controlled first value. Expired per-address buckets are purged every 15 minutes. `slanchoff` and `koldkat` bypass automatic and manual lock logic.
+
+An admin lock uses `locked_until = -1`, revokes all sessions, and closes active SSE clients. Resetting a password clears temporary lock state and revokes sessions, but does not bypass an indefinite admin lock.
+
+Forgot-password requests return the same message for present, absent, and email-less accounts. A separate process-local limit allows three reset requests per client address in 15 minutes. A token is stored only after SMTP accepts the reset message. Links are built from trusted `PUBLIC_URL`, never the request `Host` header. SMTP connections time out after 15 seconds, and non-ASCII sender names and subjects use encoded mail headers.
+
 Normal API clients send `Authorization: Bearer <token>`. EventSource and browser export navigation use `?token=` because those browser APIs do not set the bearer header in this app.
 
 Authorization boundaries:
@@ -186,8 +204,8 @@ Authorization boundaries:
 - public feed and public post routes expose only entries with `is_public = 1`
 - public entry objects replace tags with an empty array
 - private link routes require a valid random share token and also replace tags with an empty array
-- admin routes depend on localhost network origin, not a user role
-- `slanchoff` and `koldkat` cannot be deleted through the admin API
+- admin routes depend on a direct localhost socket with no forwarding headers, not a user role
+- `slanchoff` and `koldkat` cannot be deleted or locked through the admin API
 
 Tokens are stored in browser `localStorage`. Deployments should use HTTPS when accessed across a network and should avoid logging URLs containing export or SSE tokens.
 
@@ -195,13 +213,15 @@ Tokens are stored in browser `localStorage`. Deployments should use HTTPS when a
 
 ### Authentication and profile
 
-- `POST /api/register`: `{ username, password }`, returns `{ token, username }`
+- `POST /api/register`: `{ username, password, email? }`, returns `{ token, username }`
 - `POST /api/login`: `{ username, password }`, returns `{ token, username }`
+- `POST /api/password-reset/request`: `{ identity }`, returns a non-enumerating delivery message
+- `POST /api/password-reset`: `{ token, password, passwordConfirm }`, consumes a one-time token
 - `POST /api/logout`: deletes the supplied session and closes its SSE clients
-- `GET /api/me`: returns `{ username, displayName, locale, avatar }`
+- `GET /api/me`: returns `{ username, email, displayName, locale, avatar }`
 - `POST /api/locale`: authenticated compatibility endpoint that normalizes the account locale to `bg`
 - `GET /api/profile`: profile, family members, and pending invites
-- `PATCH /api/profile`: updates `displayName` and returns the refreshed profile
+- `PATCH /api/profile`: updates `displayName` and optional recovery `email`, then returns the refreshed profile
 - `POST /api/profile/password`: changes a password after verifying the current password
 - `POST /api/profile/avatar`: stores or clears an avatar data URL
 
@@ -250,7 +270,7 @@ The PDF route does not generate a PDF file on the server. The user selects PDF i
 
 ### Admin
 
-All admin routes require localhost:
+All admin routes require a direct localhost request. Requests with forwarding headers receive `403`, even when the reverse proxy connects from localhost:
 
 - `GET /admin`
 - `GET /api/admin/stats`
@@ -260,9 +280,13 @@ All admin routes require localhost:
 - `DELETE /api/admin/entries/:id`
 - `DELETE /api/admin/users/:id`
 - `DELETE /api/admin/users/:id/sessions`
+- `PATCH /api/admin/users/:id/lock`
+- `GET /api/admin/mail`
+- `PUT /api/admin/mail`
+- `POST /api/admin/mail/test`
 - `POST /api/admin/vacuum`
 
-Admin entry mutation returns `404` when the entry does not exist. Protected-user deletion returns `403`.
+Admin entry mutation returns `404` when the entry does not exist. Protected-user deletion and locking return `403`. Saving SMTP with a blank password preserves the existing secret.
 
 ## Entry validation
 
@@ -365,7 +389,7 @@ npm run docs:check
 npm run hooks:install
 ```
 
-`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, auth limits, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, photos, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and admin routes.
+`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, duplicate emails, automatic and manual account locks, forwarded-address throttling, reset-request limits, protected accounts, password reset consumption, write-only SMTP settings, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, photos, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and direct-only admin routes.
 
 `docs/*.md` files are the source of truth. `npm run docs:build` regenerates standalone HTML equivalents, while `npm run docs:html-check` fails if generated HTML is stale.
 

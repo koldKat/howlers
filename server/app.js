@@ -29,20 +29,26 @@ function createRequestHandler({ sseHub }) {
       const sharedPost = url.pathname.match(/^\/shared\/([A-Za-z0-9_-]{32})$/);
       const invite = url.pathname.match(/^\/api\/family\/invites\/(\d+)(?:\/(accept))?$/);
       const adminEntry = url.pathname.match(/^\/api\/admin\/entries\/(\d+)$/);
-      const adminUser = url.pathname.match(/^\/api\/admin\/users\/(\d+)(?:\/(sessions))?$/);
+      const adminUser = url.pathname.match(/^\/api\/admin\/users\/(\d+)(?:\/(sessions|lock))?$/);
 
       if (req.method === 'GET' && url.pathname === '/admin') return admin.handleAdminPage(req, res);
       if (req.method === 'GET' && url.pathname === '/api/admin/stats') return admin.handleAdminStats(req, res);
       if (req.method === 'GET' && url.pathname === '/api/admin/users') return admin.handleAdminUsers(req, res);
       if (req.method === 'GET' && url.pathname === '/api/admin/entries') return admin.handleAdminEntries(req, res);
+      if (req.method === 'GET' && url.pathname === '/api/admin/mail') return admin.handleAdminMailSettings(req, res);
+      if (req.method === 'PUT' && url.pathname === '/api/admin/mail') return admin.handleAdminSaveMailSettings(req, res);
+      if (req.method === 'POST' && url.pathname === '/api/admin/mail/test') return admin.handleAdminTestMail(req, res);
       if (adminEntry && req.method === 'DELETE') return admin.handleAdminDeleteEntry(req, res, Number(adminEntry[1]));
       if (adminEntry && req.method === 'PATCH') return admin.handleAdminTogglePublic(req, res, Number(adminEntry[1]));
       if (adminUser && !adminUser[2] && req.method === 'DELETE') return admin.handleAdminDeleteUser(req, res, Number(adminUser[1]));
       if (adminUser && adminUser[2] === 'sessions' && req.method === 'DELETE') return admin.handleAdminClearSessions(req, res, Number(adminUser[1]));
+      if (adminUser && adminUser[2] === 'lock' && req.method === 'PATCH') return admin.handleAdminLockUser(req, res, Number(adminUser[1]));
       if (req.method === 'POST' && url.pathname === '/api/admin/vacuum') return admin.handleAdminVacuum(req, res);
 
       if (req.method === 'POST' && url.pathname === '/api/register') return session.register(req, res);
       if (req.method === 'POST' && url.pathname === '/api/login') return session.login(req, res);
+      if (req.method === 'POST' && url.pathname === '/api/password-reset/request') return session.requestPasswordReset(req, res);
+      if (req.method === 'POST' && url.pathname === '/api/password-reset') return session.completePasswordReset(req, res);
       if (req.method === 'POST' && url.pathname === '/api/locale') return session.updateLocale(req, res);
       if (req.method === 'POST' && url.pathname === '/api/logout') return session.logout(req, res);
       if (req.method === 'GET' && url.pathname === '/api/me') return session.me(req, res);

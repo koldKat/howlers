@@ -1,5 +1,6 @@
 import { initI18n, t } from './i18n.js';
 import { apiFetch, clearToken, getToken, setToken } from './app/api.js';
+import { createAuthController } from './app/auth.js';
 import { createChildPicker } from './app/child-picker.js';
 import { bindBackdropDismiss, getAppElements } from './app/dom.js';
 import { createEditorTools } from './app/editor-tools.js';
@@ -43,6 +44,12 @@ const feedController = createFeedController(els, {
   onViewer: nextViewer => { viewer = { ...viewer, ...nextViewer }; },
 });
 const postDetailController = createPostDetailController(els);
+const authController = createAuthController(els, {
+  onAuthenticated: async token => {
+    setToken(token);
+    await hydrateApp();
+  },
+});
 
 // ── Auth state ──────────────────────────────────────────────
 
@@ -60,10 +67,6 @@ function setAuthState(isLoggedIn) {
     profileController.syncState({ attention: null });
   }
 }
-function showAuthModal(show) {
-  els.authModal.style.display = show ? 'flex' : 'none';
-}
-
 function setMobileFamilySettingsOpen(open) {
   const shouldOpen = Boolean(open) && window.matchMedia('(max-width: 860px)').matches;
   const wasOpen = els.feedSidebar.classList.contains('mobile-open');
@@ -240,26 +243,9 @@ async function hydrateApp() {
   viewer = { username: me.username, displayName: me.displayName || null };
   profileController.setInitialProfile(me);
   setAuthState(true);
-  showAuthModal(false);
+  authController.close();
   feedController.render(await apiFetch('/api/state'));
   openEvents();
-}
-
-async function handleAuth(endpoint) {
-  els.authError.textContent = '';
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: els.authUsername.value.trim(), password: els.authPassword.value }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Заявката е неуспешна.');
-    setToken(data.token);
-    await hydrateApp();
-  } catch (error) {
-    els.authError.textContent = error.message;
-  }
 }
 
 async function logout() {
@@ -273,8 +259,8 @@ async function handleSessionExpired() {
   handlingSessionExpiry = true;
   try {
     await becomeGuest();
-    showAuthModal(true);
-    els.authError.textContent = t('auth_session_expired');
+    authController.showMain();
+    authController.open(t('auth_session_expired'));
   } finally {
     handlingSessionExpiry = false;
   }
@@ -291,7 +277,7 @@ async function becomeGuest() {
   resetForm();
   setAuthState(false);
   setMobileFamilySettingsOpen(false);
-  showAuthModal(false);
+  authController.close();
   await feedController.loadPublicFeed();
   openEvents();
 }
@@ -338,8 +324,16 @@ async function deleteEntry() {
 
 async function boot() {
   await initI18n();
+  const resettingPassword = authController.openInitialReset();
   await postDetailController.openInitialRoute();
   editorTools.initializeControls();
+  if (resettingPassword) {
+    clearToken();
+    setAuthState(false);
+    await feedController.loadPublicFeed();
+    openEvents();
+    return;
+  }
   if (!getToken()) {
     setAuthState(false);
     await feedController.loadPublicFeed();
@@ -358,15 +352,13 @@ async function boot() {
 
 // ── Event listeners ───────────────────────────────────────────
 
-els.navLoginBtn.addEventListener('click', () => showAuthModal(true));
-els.guestLoginBtn.addEventListener('click', () => showAuthModal(true));
+els.navLoginBtn.addEventListener('click', () => { authController.showMain(); authController.open(); });
+els.guestLoginBtn.addEventListener('click', () => { authController.showMain(); authController.open(); });
 els.navLogoutBtn.addEventListener('click', logout);
 els.navAddBtn.addEventListener('click', () => { resetForm(); openEditor(); });
 els.mobileFamilySettings.addEventListener('click', () => setMobileFamilySettingsOpen(true));
 els.mobileFamilySettingsClose.addEventListener('click', () => setMobileFamilySettingsOpen(false));
-els.closeAuthBtn.addEventListener('click', () => showAuthModal(false));
-els.loginBtn.addEventListener('click', () => handleAuth('/api/login'));
-els.registerBtn.addEventListener('click', () => handleAuth('/api/register'));
+els.closeAuthBtn.addEventListener('click', authController.close);
 
 els.closeEditorBtn.addEventListener('click', closeEditor);
 els.editorAdvancedToggle.addEventListener('click', () => setEditorAdvancedOpen(!editorAdvancedOpen));

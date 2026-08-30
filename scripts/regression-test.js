@@ -5,6 +5,8 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
+const Database = require('better-sqlite3');
 const { buildMultiChildAgeNote } = require('../server/entry-ages');
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'howlers-regression-'));
@@ -43,8 +45,8 @@ async function waitForServer() {
   throw new Error(`Server did not start:\n${serverOutput}`);
 }
 
-async function request(pathname, { token, method = 'GET', body, bodyText, raw = false } = {}) {
-  const headers = {};
+async function request(pathname, { token, method = 'GET', body, bodyText, raw = false, headers: extraHeaders = {} } = {}) {
+  const headers = { ...extraHeaders };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined || bodyText !== undefined) headers['Content-Type'] = 'application/json';
   const response = await fetch(`${baseUrl}${pathname}`, {
@@ -59,10 +61,10 @@ async function request(pathname, { token, method = 'GET', body, bodyText, raw = 
   };
 }
 
-async function register(username, password = 'secret12') {
+async function register(username, password = 'secret12', email = '') {
   const result = await request('/api/register', {
     method: 'POST',
-    body: { username, password },
+    body: { username, password, email },
   });
   assert.equal(result.status, 200);
   assert.ok(result.body.token);
@@ -203,6 +205,11 @@ async function main() {
   assert.match(result.body, /export function createFeedLoader/);
   assert.match(result.body, /container\.replaceChildren\(loader\)/);
 
+  result = await request('/js/app/auth.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /\/api\/password-reset\/request/);
+  assert.match(result.body, /history\.replaceState/);
+
   result = await request('/css/style.css', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, /@keyframes feed-sun-spokes/);
@@ -247,6 +254,8 @@ async function main() {
   const beta = await register('beta');
   const gamma = await register('gamma');
   await register('koldkat');
+  await register('slanchoff');
+  const resetUser = await register('reset-user', 'secret12', 'reset@example.com');
 
   result = await request('/api/register', {
     method: 'POST',
@@ -254,6 +263,95 @@ async function main() {
   });
   assert.equal(result.status, 409);
   assert.equal(result.body.error, 'Потребителското име вече е заето.');
+
+  result = await request('/api/register', {
+    method: 'POST',
+    body: { username: 'duplicate-email', password: 'secret12', email: 'RESET@example.com' },
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.error, 'Потребителското име или имейлът вече се използват.');
+
+  result = await request('/api/register', {
+    method: 'POST',
+    body: { username: 'bad-email', password: 'secret12', email: 'not-an-email' },
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, 'Въведи валиден имейл адрес или остави полето празно.');
+
+  await register('lockout-user');
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    result = await request('/api/login', {
+      method: 'POST',
+      body: { username: 'lockout-user', password: 'wrong-password' },
+    });
+    assert.equal(result.status, attempt === 5 ? 423 : 401);
+  }
+  result = await request('/api/login', {
+    method: 'POST',
+    body: { username: 'lockout-user', password: 'secret12' },
+  });
+  assert.equal(result.status, 423);
+  assert.equal(result.body.manual, false);
+  const usersAfterLockout = (await request('/api/admin/users')).body;
+  const lockoutUserId = usersAfterLockout.find(user => user.username === 'lockout-user').id;
+  assert.equal((await request(`/api/admin/users/${lockoutUserId}/lock`, {
+    method: 'PATCH', body: { locked: false },
+  })).status, 200);
+  assert.equal((await request('/api/login', {
+    method: 'POST', body: { username: 'lockout-user', password: 'secret12' },
+  })).status, 200);
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    result = await request('/api/login', {
+      method: 'POST', body: { username: 'koldkat', password: 'wrong-password' },
+    });
+    assert.equal(result.status, 401);
+  }
+  assert.equal((await request('/api/login', {
+    method: 'POST', body: { username: 'koldkat', password: 'secret12' },
+  })).status, 200);
+
+  result = await request('/api/password-reset/request', {
+    method: 'POST', body: { identity: 'missing-account' },
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.message, 'Ако профилът има имейл адрес, изпратихме връзка за нова парола.');
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    result = await request('/api/password-reset/request', {
+      method: 'POST',
+      headers: { 'X-Forwarded-For': `${198 + attempt}.51.100.1, 203.0.113.9` },
+      body: { identity: 'missing-account' },
+    });
+    assert.equal(result.status, 200);
+  }
+  result = await request('/api/password-reset/request', {
+    method: 'POST',
+    headers: { 'X-Forwarded-For': '192.0.2.1, 203.0.113.9' },
+    body: { identity: 'missing-account' },
+  });
+  assert.equal(result.status, 429);
+
+  const resetToken = crypto.randomBytes(32).toString('base64url');
+  const testDb = new Database(databasePath);
+  const resetUserId = testDb.prepare('SELECT id FROM users WHERE username = ?').get('reset-user').id;
+  testDb.prepare('INSERT INTO password_reset_tokens (token_hash, user_id, expires_at) VALUES (?, ?, ?)')
+    .run(crypto.createHash('sha256').update(resetToken).digest('hex'), resetUserId, Math.floor(Date.now() / 1000) + 3600);
+  testDb.close();
+  result = await request('/api/password-reset', {
+    method: 'POST', body: { token: resetToken, password: 'new-secret12', passwordConfirm: 'new-secret12' },
+  });
+  assert.equal(result.status, 200);
+  assert.equal((await request('/api/me', { token: resetUser })).status, 401);
+  assert.equal((await request('/api/login', {
+    method: 'POST', body: { username: 'reset-user', password: 'secret12' },
+  })).status, 401);
+  assert.equal((await request('/api/login', {
+    method: 'POST', body: { username: 'reset-user', password: 'new-secret12' },
+  })).status, 200);
+  assert.equal((await request('/api/password-reset', {
+    method: 'POST', body: { token: resetToken, password: 'another-secret', passwordConfirm: 'another-secret' },
+  })).status, 400);
 
   result = await request('/api/profile', {
     token: alpha,
@@ -270,6 +368,21 @@ async function main() {
   });
   assert.equal(result.status, 400);
   assert.equal(result.body.error, 'Показваното име трябва да е до 60 символа.');
+
+  result = await request('/api/profile', {
+    token: alpha,
+    method: 'PATCH',
+    body: { displayName: 'Alpha', email: 'alpha@example.com' },
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.profile.email, 'alpha@example.com');
+  result = await request('/api/profile', {
+    token: beta,
+    method: 'PATCH',
+    body: { email: 'ALPHA@example.com' },
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.error, 'Този имейл вече се използва от друг профил.');
 
   result = await request('/api/howlers', {
     token: alpha,
@@ -766,15 +879,71 @@ async function main() {
 
   result = await request('/api/admin/stats');
   assert.equal(result.status, 200);
-  assert.equal(result.body.totalUsers, 4);
+  assert.equal(result.body.totalUsers, 7);
+  result = await request('/api/admin/stats', {
+    headers: { 'X-Forwarded-For': '203.0.113.10' },
+  });
+  assert.equal(result.status, 403);
+  result = await request('/api/admin/stats', {
+    headers: { 'X-Forwarded-Proto': 'https' },
+  });
+  assert.equal(result.status, 403);
   result = await request('/api/admin/users');
   assert.equal(result.status, 200);
-  const protectedUser = result.body.find(user => user.username === 'koldkat');
+  const adminUsers = result.body;
+  const protectedUser = adminUsers.find(user => user.username === 'koldkat');
   assert.ok(protectedUser);
   assert.equal(protectedUser.isProtected, true);
+  const protectedSlanchoff = adminUsers.find(user => user.username === 'slanchoff');
+  assert.ok(protectedSlanchoff);
+  assert.equal(protectedSlanchoff.isProtected, true);
+  assert.equal((await request(`/api/admin/users/${protectedUser.id}/lock`, {
+    method: 'PATCH', body: { locked: true },
+  })).status, 403);
+  assert.equal((await request(`/api/admin/users/${protectedSlanchoff.id}/lock`, {
+    method: 'PATCH', body: { locked: true },
+  })).status, 403);
   result = await request(`/api/admin/users/${protectedUser.id}`, { method: 'DELETE' });
   assert.equal(result.status, 403);
   assert.equal(result.body.error, 'Този администратор е защитен и не може да бъде изтрит.');
+
+  const gammaUser = adminUsers.find(user => user.username === 'gamma');
+  result = await request(`/api/admin/users/${gammaUser.id}/lock`, { method: 'PATCH', body: { locked: true } });
+  assert.equal(result.status, 200);
+  assert.equal((await request('/api/me', { token: gamma })).status, 401);
+  result = await request('/api/login', {
+    method: 'POST', body: { username: 'gamma', password: 'secret12' },
+  });
+  assert.equal(result.status, 423);
+  assert.equal(result.body.manual, true);
+  assert.equal((await request(`/api/admin/users/${gammaUser.id}/lock`, {
+    method: 'PATCH', body: { locked: false },
+  })).status, 200);
+
+  result = await request('/api/admin/mail');
+  assert.equal(result.status, 200);
+  assert.equal(result.body.configured, false);
+  assert.equal(Object.hasOwn(result.body, 'password'), false);
+  result = await request('/api/admin/mail', {
+    method: 'PUT',
+    body: {
+      host: 'mail.example.com', port: 465, security: 'tls',
+      username: 'sender@example.com', password: 'smtp-secret', sender: 'sender@example.com',
+    },
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.configured, true);
+  assert.equal(result.body.hasPassword, true);
+  assert.equal(Object.hasOwn(result.body, 'password'), false);
+  result = await request('/api/admin/mail', {
+    method: 'PUT',
+    body: {
+      host: 'mail.example.com', port: 465, security: 'tls',
+      username: 'sender@example.com', password: '', sender: 'sender@example.com',
+    },
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.hasPassword, true);
   result = await request('/api/admin/entries');
   assert.equal(result.status, 200);
   assert.equal(result.body.length, 2);
@@ -802,7 +971,16 @@ async function main() {
   assert.equal(result.body.state.entries.some(entry => entry.id === betaEntryId), false);
   assert.equal((await request(`/api/shared/${privateShareToken}`)).status, 404);
 
-  console.log('Regression suite passed: auth, profiles, invites, kids, entries, photos, sharing, SEO, feed, export, logout, and admin routes.');
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    assert.equal((await request('/api/login', {
+      method: 'POST', body: { username: 'missing-throttle-user', password: 'wrong-password' },
+    })).status, 401);
+  }
+  assert.equal((await request('/api/login', {
+    method: 'POST', body: { username: 'missing-throttle-user', password: 'wrong-password' },
+  })).status, 429);
+
+  console.log('Regression suite passed: auth lockouts, password reset, SMTP settings, profiles, invites, entries, sharing, SEO, export, and admin routes.');
 }
 
 main()

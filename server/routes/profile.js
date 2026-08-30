@@ -13,7 +13,7 @@ function createProfileHandlers({ sseHub }) {
   async function update(req, res) {
     const session = await authenticate(req, res);
     if (!session) return;
-    const { displayName } = await readBody(req);
+    const { displayName, email } = await readBody(req);
     if (displayName !== undefined && displayName !== null && typeof displayName !== 'string') {
       send(res, 400, { error: 'Показваното име трябва да е текст.' });
       return;
@@ -22,10 +22,14 @@ function createProfileHandlers({ sseHub }) {
       send(res, 400, { error: 'Показваното име трябва да е до 60 символа.' });
       return;
     }
-    const saved = db.updateProfile(session.user_id, { displayName });
+    if (email !== undefined && email !== null && typeof email !== 'string') {
+      send(res, 400, { error: 'Имейлът трябва да е текст.' });
+      return;
+    }
+    const saved = db.updateProfile(session.user_id, { displayName, email });
     const profile = db.getProfile(session.user_id);
     sseHub.publishToUsers(db.getFamilyUserIds(session.user_id));
-    send(res, 200, { ok: true, displayName: saved, profile });
+    send(res, 200, { ok: true, ...saved, profile });
   }
 
   async function updatePassword(req, res) {

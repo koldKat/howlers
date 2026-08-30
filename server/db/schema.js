@@ -48,6 +48,26 @@ function initializeSchema(db) {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      used_at INTEGER,
+      created_at INTEGER DEFAULT (strftime('%s', 'now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS mail_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      host TEXT NOT NULL,
+      port INTEGER NOT NULL,
+      security TEXT NOT NULL,
+      username TEXT NOT NULL DEFAULT '',
+      password TEXT NOT NULL,
+      sender TEXT NOT NULL,
+      updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+    );
+
     CREATE TABLE IF NOT EXISTS kids (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -90,9 +110,14 @@ function initializeSchema(db) {
   addColumnIfMissing(db, 'users', 'locale', "ALTER TABLE users ADD COLUMN locale TEXT NOT NULL DEFAULT 'bg'");
   addColumnIfMissing(db, 'users', 'display_name', 'ALTER TABLE users ADD COLUMN display_name TEXT');
   addColumnIfMissing(db, 'users', 'avatar', 'ALTER TABLE users ADD COLUMN avatar TEXT');
+  addColumnIfMissing(db, 'users', 'email', 'ALTER TABLE users ADD COLUMN email TEXT');
+  addColumnIfMissing(db, 'users', 'failed_login_attempts', 'ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(db, 'users', 'locked_until', 'ALTER TABLE users ADD COLUMN locked_until INTEGER');
   addColumnIfMissing(db, 'sessions', 'last_active_at', 'ALTER TABLE sessions ADD COLUMN last_active_at INTEGER');
   addColumnIfMissing(db, 'kids', 'family_id', 'ALTER TABLE kids ADD COLUMN family_id INTEGER');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_howlers_share_token ON howlers(share_token) WHERE share_token IS NOT NULL');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens(user_id, expires_at)');
 
   const bootstrapFamilies = db.transaction(() => {
     const users = db.prepare('SELECT id FROM users ORDER BY id ASC').all();

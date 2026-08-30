@@ -2,8 +2,9 @@
 
 const db = require('../db');
 const { PROTECTED_ADMIN_USERS } = require('../config');
-const { send, isLocalhost } = require('../http');
+const { readBody, send, isLocalhost } = require('../http');
 const { serveFile } = require('../static');
+const mailer = require('../mailer');
 
 function createAdminHandlers({ sseHub }) {
   function requireLocal(req, res) {
@@ -82,6 +83,45 @@ function createAdminHandlers({ sseHub }) {
     send(res, 200, { ok: true });
   }
 
+  async function handleAdminLockUser(req, res, userId) {
+    if (!requireLocal(req, res)) return;
+    const { locked } = await readBody(req);
+    const user = db.adminSetUserLocked(userId, locked === true);
+    if (!user) { send(res, 404, { error: 'Потребителят не е намерен.' }); return; }
+    if (user.locked) sseHub.closeClients(client => client.userId === userId, { sessionExpired: true });
+    send(res, 200, { user });
+  }
+
+  function handleAdminMailSettings(req, res) {
+    if (!requireLocal(req, res)) return;
+    send(res, 200, mailer.publicSettings());
+  }
+
+  async function handleAdminSaveMailSettings(req, res) {
+    if (!requireLocal(req, res)) return;
+    try {
+      send(res, 200, mailer.saveSettings(await readBody(req)));
+    } catch (error) {
+      send(res, 400, { error: error.message });
+    }
+  }
+
+  async function handleAdminTestMail(req, res) {
+    if (!requireLocal(req, res)) return;
+    try {
+      const input = await readBody(req);
+      const settings = mailer.publicSettings();
+      await mailer.send({
+        to: String(input.to || settings.sender || ''),
+        subject: 'Тест на имейла от Семейни бисери',
+        text: 'Изпращането на имейли е настроено правилно.',
+      });
+      send(res, 200, { ok: true });
+    } catch (error) {
+      send(res, 400, { error: error.message });
+    }
+  }
+
   async function handleAdminVacuum(req, res) {
     if (!requireLocal(req, res)) return;
     db.adminVacuum();
@@ -97,6 +137,10 @@ function createAdminHandlers({ sseHub }) {
     handleAdminTogglePublic,
     handleAdminDeleteUser,
     handleAdminClearSessions,
+    handleAdminLockUser,
+    handleAdminMailSettings,
+    handleAdminSaveMailSettings,
+    handleAdminTestMail,
     handleAdminVacuum,
   };
 }

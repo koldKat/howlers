@@ -80,6 +80,7 @@ export function createProfileController(elements, { getViewer, setViewer, onFami
     updateNavAvatar(currentProfile.displayName, currentProfile.username, currentProfile.avatar);
     elements.profileUsernameRo.value = currentProfile.username;
     elements.profileDisplayName.value = currentProfile.displayName || '';
+    elements.profileEmail.value = currentProfile.email || '';
     setProfileAvatar(currentProfile.avatar || null, currentProfile.username, currentProfile.displayName);
 
     const incomingInvites = currentProfile.incomingInvites || [];
@@ -132,6 +133,7 @@ export function createProfileController(elements, { getViewer, setViewer, onFami
     if (!viewer) return;
     elements.profileUsernameRo.value = viewer.username;
     elements.profileDisplayName.value = currentProfile?.displayName || '';
+    elements.profileEmail.value = currentProfile?.email || '';
     setProfileAvatar(currentProfile?.avatar || null, viewer.username, currentProfile?.displayName);
     for (const error of [elements.profileIdentityError, elements.profileInviteError, elements.profilePwError]) {
       error.textContent = '';
@@ -162,7 +164,10 @@ export function createProfileController(elements, { getViewer, setViewer, onFami
     try {
       const response = await apiFetch('/api/profile', {
         method: 'PATCH',
-        body: JSON.stringify({ displayName: elements.profileDisplayName.value }),
+        body: JSON.stringify({
+          displayName: elements.profileDisplayName.value,
+          email: elements.profileEmail.value,
+        }),
       });
       if (response.ok) {
         renderDetails(response.profile || { displayName: response.displayName });

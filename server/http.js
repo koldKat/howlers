@@ -54,6 +54,8 @@ function tokenFromReq(req) {
 }
 
 function isLocalhost(req) {
+  const proxyHeaders = ['forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip'];
+  if (proxyHeaders.some(name => req.headers[name])) return false;
   const addr = req.socket.remoteAddress || '';
   return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
 }

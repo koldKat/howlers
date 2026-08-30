@@ -51,8 +51,9 @@ npm start</code></pre>
 <li><code>PORT</code>: listener port, default <code>3019</code></li>
 <li><code>DATABASE_PATH</code>: absolute path or a path resolved from the process working directory, default <code>database.sqlite</code> in the repository root</li>
 <li><code>DISABLE_BACKUPS=1</code>: disables backup scheduling</li>
+<li><code>PUBLIC_URL</code>: trusted origin used in password-reset links, default <code>https://biseri.net</code></li>
 </ul>
-<p>The server binds through <code>server.listen(PORT)</code> and is therefore reachable on the interfaces selected by Node.js for the host. The admin routes still enforce a localhost remote address.</p>
+<p>The server binds through <code>server.listen(PORT)</code> and is therefore reachable on the interfaces selected by Node.js for the host. Admin routes require a localhost socket and reject requests carrying <code>Forwarded</code>, <code>X-Forwarded-*</code>, or <code>X-Real-IP</code>.</p>
 <h2>Repository layout</h2>
 <p>Server composition:</p>
 <ul>
@@ -63,10 +64,12 @@ npm start</code></pre>
 <li><code>server/date-validation.js</code>: shared local date formatting and real calendar date validation</li>
 <li><code>server/entry-ages.js</code>: backward-compatible per-child age snapshots for multi-child entries</li>
 <li><code>server/auth.js</code>: authenticated session guard</li>
+<li><code>server/auth-rate-limit.js</code>: process-local failed-authentication window by client IP</li>
+<li><code>server/mailer.js</code>: SMTP settings, validation, encoded multipart message generation, bounded connections, and TLS delivery</li>
 <li><code>server/db.js</code>: stable persistence facade used by routes and services</li>
 <li><code>server/db/connection.js</code>: SQLite connection and startup initialization</li>
 <li><code>server/db/schema.js</code>: idempotent schema creation, migrations, and family bootstrap</li>
-<li><code>server/db/accounts.js</code>: credentials, sessions, viewer data, and profile persistence</li>
+<li><code>server/db/accounts.js</code>: credentials, email, lockouts, reset tokens, sessions, viewer data, and profile persistence</li>
 <li><code>server/db/families.js</code>: family membership, invitations, merges, and children</li>
 <li><code>server/db/entries.js</code>: entry queries, writes, mapping, and summaries</li>
 <li><code>server/db/admin.js</code>: admin reports, mutations, maintenance, and backup snapshots</li>
@@ -79,7 +82,7 @@ npm start</code></pre>
 <li><code>server/image-validation.js</code>: raster data URL size and signature checks</li>
 <li><code>server/howler-validation.js</code>: entry normalization and validation</li>
 <li><code>server/backup.js</code>: hourly ZIP creation and 14-day retention</li>
-<li><code>server/routes/session.js</code>: registration, login, logout, state, export, and SSE handlers</li>
+<li><code>server/routes/session.js</code>: registration, login, password reset, logout, state, export, and SSE handlers</li>
 <li><code>server/routes/profile.js</code>: profile, avatar, and password handlers</li>
 <li><code>server/routes/families.js</code>: child and family-invitation handlers</li>
 <li><code>server/routes/entries.js</code>: entry create, update, and delete handlers</li>
@@ -98,6 +101,7 @@ npm start</code></pre>
 <li><code>public/js/app/entry-presentation.js</code>: entry labels, metadata, inline formatting, and SVG emoticon rendering</li>
 <li><code>public/js/app/feed.js</code>: public and private feed rendering, filtering, and summary presentation</li>
 <li><code>public/js/app/feed-loading.js</code>: reusable feed-loader cloning and localized status updates</li>
+<li><code>public/js/app/auth.js</code>: login, registration, forgot-password, and reset-password controller</li>
 <li><code>public/js/app/post-detail.js</code>: public/private-link detail dialog, browser history, and Web Share integration</li>
 <li><code>public/js/app/format.js</code>: escaping, dates, and data URL sizing</li>
 <li><code>public/js/app/kids.js</code>: child-list rendering and child create/delete actions</li>
@@ -130,6 +134,8 @@ npm start</code></pre>
 <li><code>locale</code>, currently normalized to <code>bg</code></li>
 <li>optional <code>display_name</code></li>
 <li>optional <code>avatar</code> data URL</li>
+<li>optional case-insensitively unique <code>email</code></li>
+<li><code>failed_login_attempts</code> and optional <code>locked_until</code>; <code>-1</code> represents an indefinite admin lock</li>
 </ul>
 <p>Avatars must be JPEG, PNG, WebP, or GIF and decode to no more than 300 KiB.</p>
 <h3><code>families</code> and <code>family_members</code></h3>
@@ -145,6 +151,9 @@ npm start</code></pre>
 <li><code>last_active_at</code></li>
 </ul>
 <p><code>getSession()</code> updates <code>last_active_at</code>. At server startup, sessions inactive for more than seven days are purged. Session deletion is also used by logout and admin session clearing.</p>
+<h3><code>password_reset_tokens</code> and <code>mail_settings</code></h3>
+<p>Reset rows store a SHA-256 token hash, user, expiry, optional use time, and creation time. Raw 256-bit reset tokens exist only in the generated email link. Tokens expire after one hour and are one-time use.</p>
+<p><code>mail_settings</code> contains one row with SMTP host, port, <code>tls</code>, <code>starttls</code>, or <code>none</code> security, username, password, sender, and update time. Admin responses expose only <code>hasPassword</code>, never the password value.</p>
 <h3><code>kids</code></h3>
 <p>Children have an owner <code>user_id</code>, shared <code>family_id</code>, name, optional <code>dob</code>, and creation time. Removing a child from the family list does not alter existing entry text.</p>
 <h3><code>howlers</code></h3>
@@ -164,6 +173,9 @@ npm start</code></pre>
 <p>Entry photos use allowlisted raster data URLs and decode to no more than 512 KiB. Images and avatars are stored inside SQLite, so they contribute directly to database and backup size.</p>
 <h2>Authentication and authorization</h2>
 <p>Passwords are hashed with <code>crypto.scrypt</code> and a random per-user salt. Session tokens are 32 random bytes encoded as hexadecimal.</p>
+<p>Five consecutive incorrect passwords temporarily lock a normal account for 15 minutes. Successful authentication or admin unlock clears the account counter. A process-local IP throttle blocks subsequent login or registration requests after eight failures within 15 minutes and is cleared by successful authentication. Forwarded addresses are trusted only when the immediate peer is localhost; when local Nginx appends a chain, the throttle uses its last address rather than a client-controlled first value. Expired per-address buckets are purged every 15 minutes. <code>slanchoff</code> and <code>koldkat</code> bypass automatic and manual lock logic.</p>
+<p>An admin lock uses <code>locked_until = -1</code>, revokes all sessions, and closes active SSE clients. Resetting a password clears temporary lock state and revokes sessions, but does not bypass an indefinite admin lock.</p>
+<p>Forgot-password requests return the same message for present, absent, and email-less accounts. A separate process-local limit allows three reset requests per client address in 15 minutes. A token is stored only after SMTP accepts the reset message. Links are built from trusted <code>PUBLIC_URL</code>, never the request <code>Host</code> header. SMTP connections time out after 15 seconds, and non-ASCII sender names and subjects use encoded mail headers.</p>
 <p>Normal API clients send <code>Authorization: Bearer &lt;token&gt;</code>. EventSource and browser export navigation use <code>?token=</code> because those browser APIs do not set the bearer header in this app.</p>
 <p>Authorization boundaries:</p>
 <ul>
@@ -172,20 +184,22 @@ npm start</code></pre>
 <li>public feed and public post routes expose only entries with <code>is_public = 1</code></li>
 <li>public entry objects replace tags with an empty array</li>
 <li>private link routes require a valid random share token and also replace tags with an empty array</li>
-<li>admin routes depend on localhost network origin, not a user role</li>
-<li><code>slanchoff</code> and <code>koldkat</code> cannot be deleted through the admin API</li>
+<li>admin routes depend on a direct localhost socket with no forwarding headers, not a user role</li>
+<li><code>slanchoff</code> and <code>koldkat</code> cannot be deleted or locked through the admin API</li>
 </ul>
 <p>Tokens are stored in browser <code>localStorage</code>. Deployments should use HTTPS when accessed across a network and should avoid logging URLs containing export or SSE tokens.</p>
 <h2>API routes</h2>
 <h3>Authentication and profile</h3>
 <ul>
-<li><code>POST /api/register</code>: <code>{ username, password }</code>, returns <code>{ token, username }</code></li>
+<li><code>POST /api/register</code>: <code>{ username, password, email? }</code>, returns <code>{ token, username }</code></li>
 <li><code>POST /api/login</code>: <code>{ username, password }</code>, returns <code>{ token, username }</code></li>
+<li><code>POST /api/password-reset/request</code>: <code>{ identity }</code>, returns a non-enumerating delivery message</li>
+<li><code>POST /api/password-reset</code>: <code>{ token, password, passwordConfirm }</code>, consumes a one-time token</li>
 <li><code>POST /api/logout</code>: deletes the supplied session and closes its SSE clients</li>
-<li><code>GET /api/me</code>: returns <code>{ username, displayName, locale, avatar }</code></li>
+<li><code>GET /api/me</code>: returns <code>{ username, email, displayName, locale, avatar }</code></li>
 <li><code>POST /api/locale</code>: authenticated compatibility endpoint that normalizes the account locale to <code>bg</code></li>
 <li><code>GET /api/profile</code>: profile, family members, and pending invites</li>
-<li><code>PATCH /api/profile</code>: updates <code>displayName</code> and returns the refreshed profile</li>
+<li><code>PATCH /api/profile</code>: updates <code>displayName</code> and optional recovery <code>email</code>, then returns the refreshed profile</li>
 <li><code>POST /api/profile/password</code>: changes a password after verifying the current password</li>
 <li><code>POST /api/profile/avatar</code>: stores or clears an avatar data URL</li>
 </ul>
@@ -228,7 +242,7 @@ npm start</code></pre>
 </ul>
 <p>The PDF route does not generate a PDF file on the server. The user selects PDF in the browser print dialog.</p>
 <h3>Admin</h3>
-<p>All admin routes require localhost:</p>
+<p>All admin routes require a direct localhost request. Requests with forwarding headers receive <code>403</code>, even when the reverse proxy connects from localhost:</p>
 <ul>
 <li><code>GET /admin</code></li>
 <li><code>GET /api/admin/stats</code></li>
@@ -238,9 +252,13 @@ npm start</code></pre>
 <li><code>DELETE /api/admin/entries/:id</code></li>
 <li><code>DELETE /api/admin/users/:id</code></li>
 <li><code>DELETE /api/admin/users/:id/sessions</code></li>
+<li><code>PATCH /api/admin/users/:id/lock</code></li>
+<li><code>GET /api/admin/mail</code></li>
+<li><code>PUT /api/admin/mail</code></li>
+<li><code>POST /api/admin/mail/test</code></li>
 <li><code>POST /api/admin/vacuum</code></li>
 </ul>
-<p>Admin entry mutation returns <code>404</code> when the entry does not exist. Protected-user deletion returns <code>403</code>.</p>
+<p>Admin entry mutation returns <code>404</code> when the entry does not exist. Protected-user deletion and locking return <code>403</code>. Saving SMTP with a blank password preserves the existing secret.</p>
 <h2>Entry validation</h2>
 <p>Server validation enforces:</p>
 <ul>
@@ -311,7 +329,7 @@ npm run docs:build
 npm run docs:html-check
 npm run docs:check
 npm run hooks:install</code></pre>
-<p><code>npm test</code> starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, auth limits, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, photos, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and admin routes.</p>
+<p><code>npm test</code> starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, duplicate emails, automatic and manual account locks, forwarded-address throttling, reset-request limits, protected accounts, password reset consumption, write-only SMTP settings, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, photos, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and direct-only admin routes.</p>
 <p><code>docs/*.md</code> files are the source of truth. <code>npm run docs:build</code> regenerates standalone HTML equivalents, while <code>npm run docs:html-check</code> fails if generated HTML is stale.</p>
 <p><code>npm run docs:check</code> examines staged application changes, including deletions, requires a staged Markdown documentation update when behavior, API, storage, setup, or maintainability changed, and verifies that all generated HTML files match their Markdown sources. A Git inspection error fails the check. <code>DOCS_GUARD_BYPASS=1</code> skips only the relevance check and still checks HTML synchronization.</p>
   </main>
