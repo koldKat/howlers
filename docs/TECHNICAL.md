@@ -358,7 +358,7 @@ Post bodies use justified alignment through the shared `.entry-content` rule, in
 
 Modal dismissal accepts Escape, the close button, or an intentional click on the backdrop. Pointer dragging that starts inside a dialog does not dismiss it when released outside.
 
-The editor overlay follows `window.visualViewport.height` and `offsetTop`, updating on viewport resize and scroll. This avoids positioning the mobile sheet against the larger layout viewport while browser chrome or the software keyboard reduces the visible area. CSS `100dvh` is the fallback, safe-area insets pad the mobile overlay, body scrolling is locked while editing, and the editor header remains sticky inside its scroll container.
+The editor and profile overlays follow `window.visualViewport.height` and `offsetTop`, updating on viewport resize and scroll. This avoids positioning either mobile sheet against the larger layout viewport while browser chrome or the software keyboard reduces the visible area. CSS `100dvh` is the fallback, safe-area insets pad both overlays, and background scrolling is locked while either is open. On mobile the editor and profile use the full visible height from the top edge, scroll internally, and keep their headers sticky.
 
 The shared-post dialog keeps the entry title only inside the entry card. Its compact header contains the shared-post label and close control, avoiding a duplicate visible title. The dialog uses `height: fit-content` because Brave's native modal top-layer rules stretch `height: auto` to the available viewport after `showModal()` hydration. It keeps an 8 px viewport margin on narrow screens and gives long posts a bounded, internally scrolling body. Private shared links hide the otherwise empty footer because they deliberately have no share action. Server-rendered detail routes use explicit 50% positioning and translation so the pre-hydration dialog is centered without stretching to the viewport. On narrow screens the family settings sheet receives dialog semantics, moves focus to its close control, traps keyboard focus while open, closes on Escape, and returns focus to its opener.
 
@@ -369,7 +369,7 @@ Direct `/posts/:id` and `/shared/:token` responses mark their populated dialog w
 The CSS uses three responsive ranges:
 
 - up to 860 px: the layout becomes one column
-- up to 600 px: controls stack and editor/profile dialogs become bottom sheets
+- up to 600 px: controls stack and editor/profile dialogs use the full visible mobile viewport
 - up to 860 px: family summary and child management move into a full-screen settings sheet opened from an SVG cog in the app header; its sticky close row and `z-index: 120` keep it above the `z-index: 100` navigation bar
 - up to 400 px: compact actions stack where necessary
 

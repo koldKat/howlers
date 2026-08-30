@@ -990,7 +990,7 @@ body.post-detail-open { overflow: hidden; }
   background: rgba(255, 249, 237, 0.98);
   box-shadow: 0 8px 18px rgba(68, 102, 164, 0.08);
 }
-body.editor-open { overflow: hidden; }
+body.editor-open, body.profile-open { overflow: hidden; }
 .editor-actions { margin-top: 0.65rem; align-items: center; }
 
 /* ── Profile modal ── */
@@ -1368,12 +1368,30 @@ body.editor-open { overflow: hidden; }
     overflow-y: auto;
   }
 
-  /* Profile modal - full-width bottom sheet */
-  #profile-modal { padding: 0; align-items: flex-end; }
+  /* Profile modal - full visible viewport */
+  #profile-modal {
+    inset: auto 0 auto 0;
+    top: var(--profile-viewport-top, 0px);
+    width: 100vw;
+    height: var(--profile-viewport-height, 100dvh);
+    padding: max(env(safe-area-inset-top), 4px) 0 max(env(safe-area-inset-bottom), 0px);
+    align-items: stretch;
+  }
   .profile-card {
     width: 100vw !important;
-    max-height: 88vh;
-    border-radius: 24px 24px 0 0 !important;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0 !important;
+  }
+  .profile-card > .panel-head {
+    position: sticky;
+    top: -0.58rem;
+    z-index: 2;
+    margin: -0.58rem -0.58rem 0.55rem;
+    padding: 0.58rem;
+    background: rgba(255, 249, 237, 0.98);
+    border-bottom: 1px solid rgba(68, 102, 164, 0.12);
+    box-shadow: 0 8px 18px rgba(68, 102, 164, 0.08);
   }
 
   /* Confirm dialog */

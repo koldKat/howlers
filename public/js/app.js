@@ -32,6 +32,7 @@ const profileController = createProfileController(els, {
   getViewer: () => viewer,
   setViewer: value => { viewer = value; },
   onFamilyAccepted: () => hydrateApp(),
+  onOpen: syncProfileViewport,
 });
 const kidsController = createKidsController(els, { childPicker, askConfirm });
 const feedController = createFeedController(els, {
@@ -96,13 +97,16 @@ function setMobileFamilySettingsOpen(open) {
 
 function isEditorOpen() { return els.editorOverlay.classList.contains('active'); }
 
-function syncEditorViewport() {
+function syncOverlayViewport(overlay, prefix) {
   const viewport = window.visualViewport;
   const height = Math.round(viewport?.height || window.innerHeight);
   const top = Math.round(viewport?.offsetTop || 0);
-  els.editorOverlay.style.setProperty('--editor-viewport-height', `${height}px`);
-  els.editorOverlay.style.setProperty('--editor-viewport-top', `${top}px`);
+  overlay.style.setProperty(`--${prefix}-viewport-height`, `${height}px`);
+  overlay.style.setProperty(`--${prefix}-viewport-top`, `${top}px`);
 }
+
+function syncEditorViewport() { syncOverlayViewport(els.editorOverlay, 'editor'); }
+function syncProfileViewport() { syncOverlayViewport(els.profileModal, 'profile'); }
 
 function openEditor() {
   syncEditorViewport();
@@ -471,10 +475,12 @@ window.matchMedia('(max-width: 860px)').addEventListener('change', event => {
 for (const eventName of ['resize', 'scroll']) {
   window.visualViewport?.addEventListener(eventName, () => {
     if (isEditorOpen()) syncEditorViewport();
+    if (profileController.isOpen()) syncProfileViewport();
   });
 }
 window.addEventListener('resize', () => {
   if (isEditorOpen()) syncEditorViewport();
+  if (profileController.isOpen()) syncProfileViewport();
 });
 
 Object.entries(editorValidationFields).forEach(([field, controls]) => {

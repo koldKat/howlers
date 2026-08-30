@@ -138,6 +138,8 @@ async function main() {
   assert.match(result.body, /createFeedController/);
   assert.match(result.body, /kidsController\.render\(\[\]\)/);
   assert.match(result.body, /window\.visualViewport/);
+  assert.match(result.body, /syncOverlayViewport\(els\.profileModal, 'profile'\)/);
+  assert.match(result.body, /profileController\.isOpen\(\)/);
   assert.match(result.body, /await postDetailController\.openInitialRoute\(\);\s+editorTools\.initializeControls\(\)/);
   assert.match(result.body, /els\.editorDialog\.scrollTop = 0/);
   assert.doesNotMatch(result.body, /latestKids/);
@@ -145,6 +147,10 @@ async function main() {
   result = await request('/css/style.css', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, /--editor-viewport-height/);
+  assert.match(result.body, /--profile-viewport-height/);
+  assert.match(result.body, /#profile-modal\s*\{[\s\S]*top:\s*var\(--profile-viewport-top[\s\S]*height:\s*var\(--profile-viewport-height[\s\S]*align-items:\s*stretch/);
+  assert.match(result.body, /\.profile-card\s*>\s*\.panel-head\s*\{[\s\S]*position:\s*sticky/);
+  assert.doesNotMatch(result.body, /#profile-modal\s*\{\s*padding:\s*0;\s*align-items:\s*flex-end/);
   assert.match(result.body, /\.editor-dialog-head\s*\{[\s\S]*position: sticky/);
   assert.match(result.body, /\.post-detail-dialog\[data-server-rendered\]\[open\]/);
   assert.match(result.body, /\.post-detail-dialog\[data-server-rendered\]\[open\]\s*\{[\s\S]*?top:\s*50%[\s\S]*?transform:\s*translate\(-50%,\s*-50%\)/);

@@ -2,7 +2,7 @@ import { t } from '../i18n.js';
 import { apiFetch, getToken } from './api.js';
 import { escapeHtml } from './format.js';
 
-export function createProfileController(elements, { getViewer, setViewer, onFamilyAccepted }) {
+export function createProfileController(elements, { getViewer, setViewer, onFamilyAccepted, onOpen }) {
   let currentProfile = null;
 
   function updateNavAvatar(displayName, username, avatar) {
@@ -131,6 +131,7 @@ export function createProfileController(elements, { getViewer, setViewer, onFami
   async function open() {
     const viewer = getViewer();
     if (!viewer) return;
+    onOpen?.();
     elements.profileUsernameRo.value = viewer.username;
     elements.profileDisplayName.value = currentProfile?.displayName || '';
     elements.profileEmail.value = currentProfile?.email || '';
@@ -146,6 +147,7 @@ export function createProfileController(elements, { getViewer, setViewer, onFami
     elements.profileAttentionSection.style.display = 'none';
     elements.profileAttentionDivider.style.display = 'none';
     elements.profileModal.style.display = 'flex';
+    document.body.classList.add('profile-open');
     elements.profileCard.scrollTop = 0;
     try {
       await loadDetails();
@@ -156,6 +158,7 @@ export function createProfileController(elements, { getViewer, setViewer, onFami
 
   function close() {
     elements.profileModal.style.display = 'none';
+    document.body.classList.remove('profile-open');
   }
 
   async function saveIdentity() {
@@ -247,7 +250,9 @@ export function createProfileController(elements, { getViewer, setViewer, onFami
     try {
       await apiFetch(`/api/family/invites/${inviteId}/accept`, { method: 'POST' });
       await onFamilyAccepted();
+      onOpen?.();
       elements.profileModal.style.display = 'flex';
+      document.body.classList.add('profile-open');
       await loadDetails();
       elements.profileInviteError.textContent = t('profile_invite_accepted');
       elements.profileInviteError.className = 'inline-error profile-success';
@@ -335,6 +340,7 @@ export function createProfileController(elements, { getViewer, setViewer, onFami
   return {
     clear,
     close,
+    isOpen: () => elements.profileModal.style.display !== 'none',
     open,
     setInitialProfile,
     syncState,
