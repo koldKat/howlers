@@ -198,8 +198,10 @@ async function main() {
   assert.match(result.body, /<meta name="theme-color" content="#57b9ff">/);
   assert.match(result.body, /class="feed-loading" role="status" aria-live="polite"/);
   assert.match(result.body, /class="panel-head editor-dialog-head"/);
+  assert.match(result.body, /class="app-footer" aria-label="Copyright">[\s\S]*class="app-footer-content">[\s\S]*class="app-footer-brand">koldKat productions<[\s\S]*data-copyright-year>© 2026/);
   assert.equal((result.body.match(/class="text-format-toolbar"/g) || []).length, 1);
   assert.equal((result.body.match(/class="inline-emote-picker"/g) || []).length, 1);
+  assert.ok(result.body.includes('class="editor-inline-tools"'));
   assert.doesNotMatch(result.body, /data-format-target="title"|data-emote-target="title"/);
   assert.match(result.body, /id="form-error" class="inline-error" role="alert" aria-live="assertive"/);
   assert.equal((result.body.match(/class="feed-loading-spoke feed-loading-spoke-\d"/g) || []).length, 4);
@@ -224,10 +226,19 @@ async function main() {
   result = await request('/js/app.js', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, /markEditorValidationError\(error\.field\)/);
+  assert.match(result.body, /copyrightYear > COPYRIGHT_START_YEAR[\s\S]*`© \$\{COPYRIGHT_START_YEAR\}-\$\{copyrightYear\}`/);
   assert.doesNotMatch(result.body, /showAuthModal/);
 
   result = await request('/css/style.css', { raw: true });
   assert.equal(result.status, 200);
+  assert.ok(result.body.includes('grid-template-columns: auto minmax(0, 1fr)'));
+  assert.ok(result.body.includes('justify-content: flex-end'));
+  assert.ok(result.body.includes('overflow-x: auto'));
+  assert.ok(result.body.includes('scrollbar-width: none'));
+  assert.match(result.body, /\.inline-emote-picker::\-webkit-scrollbar\s*\{ display: none; \}/);
+  assert.match(result.body, /\.app-footer\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 300px/);
+  assert.match(result.body, /\.app-footer-content\s*\{[\s\S]*grid-column:\s*1[\s\S]*text-align:\s*center/);
+  assert.match(result.body, /\.app-footer-brand\s*\{[\s\S]*color:\s*#873800[\s\S]*font-weight:\s*700/);
   assert.match(result.body, /@keyframes feed-sun-spokes/);
   assert.match(result.body, /prefers-reduced-motion: reduce/);
 

@@ -192,6 +192,13 @@
 
   </div>
 
+  <footer class="app-footer" aria-label="Copyright">
+    <div class="app-footer-content">
+      <span class="app-footer-brand">koldKat productions</span>
+      <span id="app-footer-copy" data-copyright-year>© 2026</span>
+    </div>
+  </footer>
+
   <!-- Public post detail dialog. Server-rendered share URLs populate the same shell. -->
   <dialog id="post-detail-dialog" class="post-detail-dialog" aria-labelledby="post-detail-eyebrow">
     <div class="post-detail-header">
@@ -299,8 +306,10 @@
         <label class="wide">
           <span data-i18n="form_label_content">Запис</span>
           <textarea id="content" rows="7" data-i18n-placeholder="placeholder_content" placeholder="Запиши точната реплика и какво се случи."></textarea>
-          <div class="text-format-toolbar" data-format-target="content" aria-label="Форматиране на записа"></div>
-          <div class="inline-emote-picker" data-emote-target="content" aria-label="Добави емотикон в записа"></div>
+          <div class="editor-inline-tools">
+            <div class="text-format-toolbar" data-format-target="content" aria-label="Форматиране на записа"></div>
+            <div class="inline-emote-picker" data-emote-target="content" aria-label="Добави емотикон в записа"></div>
+          </div>
         </label>
         <div id="post-photo-field" class="wide post-photo-field">
           <span class="post-photo-label" data-i18n="form_label_photo">Снимка</span>

@@ -85,7 +85,7 @@ Browser code:
 - `public/js/app/constants.js`: categories, moods, emoticons, formatting, and client upload limits
 - `public/js/app/dom.js`: DOM references and backdrop dismissal
 - `public/js/app/child-picker.js`: multi-child selection and age-note calculation
-- `public/js/app/editor-tools.js`: cursor-aware shared formatting and emoticon controls, shortcuts, photo processing, and editor controls
+- `public/js/app/editor-tools.js`: cursor-aware shared formatting and emoticon controls, shortcuts, photo processing, and editor controls; the shared tool strip keeps formatting left and a horizontally scrollable emote row right without a visible scrollbar
 - `public/js/app/entry-presentation.js`: entry labels, metadata, inline formatting, and SVG emoticon rendering
 - `public/js/app/feed.js`: public and private feed rendering, filtering, and summary presentation
 - `public/js/app/feed-loading.js`: reusable feed-loader cloning and localized status updates
@@ -97,6 +97,8 @@ Browser code:
 - `public/js/i18n.js`: locale loading and DOM translation
 - `public/locales/bg.json`: Bulgarian strings
 - `public/admin.html`, `public/js/admin.js`, `public/js/admin/*`, `public/css/admin.css`: admin panel
+
+The page footer follows the Gamebooks and games-app family branding: **koldKat productions** followed by a copyright year. It reuses the page grid but occupies only the feed column, so its text is centered under the feed rather than the viewport. Dark burnt orange and slate text keep the notice readable over the grass band. `COPYRIGHT_START_YEAR` is defined in `public/js/app/constants.js`; the browser keeps `2026` during the starting year and automatically expands it to a normal-hyphen year range later.
 
 Documentation and verification:
 

@@ -2,6 +2,7 @@ import { initI18n, t } from './i18n.js';
 import { apiFetch, clearToken, getToken, setToken } from './app/api.js';
 import { createAuthController } from './app/auth.js';
 import { createChildPicker } from './app/child-picker.js';
+import { COPYRIGHT_START_YEAR } from './app/constants.js';
 import { bindBackdropDismiss, getAppElements } from './app/dom.js';
 import { createEditorTools } from './app/editor-tools.js';
 import { createFeedController } from './app/feed.js';
@@ -50,6 +51,11 @@ const authController = createAuthController(els, {
     await hydrateApp();
   },
 });
+
+const copyrightYear = new Date().getFullYear();
+els.copyrightYear.textContent = copyrightYear > COPYRIGHT_START_YEAR
+  ? `© ${COPYRIGHT_START_YEAR}-${copyrightYear}`
+  : `© ${COPYRIGHT_START_YEAR}`;
 
 // ── Auth state ──────────────────────────────────────────────
 

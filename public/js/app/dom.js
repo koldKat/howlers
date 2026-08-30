@@ -94,6 +94,7 @@ export function getAppElements() {
     kidsSub:       document.getElementById('kids-sub'),
     categoryStrip: document.getElementById('category-strip'),
     kidsStrip:     document.getElementById('kids-strip'),
+    copyrightYear: document.querySelector('[data-copyright-year]'),
     // Public post detail
     postDetailDialog: document.getElementById('post-detail-dialog'),
     postDetailBody: document.getElementById('post-detail-body'),

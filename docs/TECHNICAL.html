@@ -97,7 +97,7 @@ npm start</code></pre>
 <li><code>public/js/app/constants.js</code>: categories, moods, emoticons, formatting, and client upload limits</li>
 <li><code>public/js/app/dom.js</code>: DOM references and backdrop dismissal</li>
 <li><code>public/js/app/child-picker.js</code>: multi-child selection and age-note calculation</li>
-<li><code>public/js/app/editor-tools.js</code>: cursor-aware shared formatting and emoticon controls, shortcuts, photo processing, and editor controls</li>
+<li><code>public/js/app/editor-tools.js</code>: cursor-aware shared formatting and emoticon controls, shortcuts, photo processing, and editor controls; the shared tool strip keeps formatting left and a horizontally scrollable emote row right without a visible scrollbar</li>
 <li><code>public/js/app/entry-presentation.js</code>: entry labels, metadata, inline formatting, and SVG emoticon rendering</li>
 <li><code>public/js/app/feed.js</code>: public and private feed rendering, filtering, and summary presentation</li>
 <li><code>public/js/app/feed-loading.js</code>: reusable feed-loader cloning and localized status updates</li>
@@ -110,6 +110,7 @@ npm start</code></pre>
 <li><code>public/locales/bg.json</code>: Bulgarian strings</li>
 <li><code>public/admin.html</code>, <code>public/js/admin.js</code>, <code>public/js/admin/*</code>, <code>public/css/admin.css</code>: admin panel</li>
 </ul>
+<p>The page footer follows the Gamebooks and games-app family branding: <strong>koldKat productions</strong> followed by a copyright year. It reuses the page grid but occupies only the feed column, so its text is centered under the feed rather than the viewport. Dark burnt orange and slate text keep the notice readable over the grass band. <code>COPYRIGHT_START_YEAR</code> is defined in <code>public/js/app/constants.js</code>; the browser keeps <code>2026</code> during the starting year and automatically expands it to a normal-hyphen year range later.</p>
 <p>Documentation and verification:</p>
 <ul>
 <li><code>scripts/regression-test.js</code>: isolated HTTP regression suite</li>

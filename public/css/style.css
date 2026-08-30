@@ -262,6 +262,26 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   gap: 14px;
   align-items: start;
 }
+.app-footer {
+  width: min(1100px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 0 0 1rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+  color: #34415c;
+  font: 400 11px/1.4 ui-monospace, monospace;
+  pointer-events: none;
+  user-select: none;
+}
+.app-footer-content {
+  grid-column: 1;
+  text-align: center;
+}
+.app-footer-brand {
+  color: #873800;
+  font-weight: 700;
+}
 .feed-col {
   display: flex;
   flex-direction: column;
@@ -732,9 +752,17 @@ body.post-detail-open { overflow: hidden; }
   font-size: 0.8rem;
   line-height: 1.35;
 }
+.editor-inline-tools {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
 .text-format-toolbar {
   display: flex;
   gap: 0.28rem;
+  flex: 0 0 auto;
 }
 .text-format-btn {
   width: 30px;
@@ -757,10 +785,15 @@ body.post-detail-open { overflow: hidden; }
 .format-strike { text-decoration: line-through; }
 .inline-emote-picker {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
   gap: 0.28rem;
-  margin-top: -0.05rem;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0.12rem 0.1rem;
+  scrollbar-width: none;
 }
+.inline-emote-picker::-webkit-scrollbar { display: none; }
 .inline-emote-btn {
   width: 34px;
   height: 34px;
@@ -1219,6 +1252,7 @@ body.editor-open { overflow: hidden; }
 /* ── Responsive ── */
 @media (max-width: 860px) {
   .page-layout { grid-template-columns: 1fr; }
+  .app-footer { grid-template-columns: 1fr; }
   #guest-sidebar { position: static; }
   #mobile-family-settings { display: inline-flex; }
   .mobile-sidebar-head {
@@ -1263,6 +1297,7 @@ body.editor-open { overflow: hidden; }
 
   /* Page */
   .page-layout { width: calc(100vw - 12px); margin-top: 6px; gap: 8px; }
+  .app-footer { width: calc(100vw - 12px); }
 
   /* Feed toolbar */
   .feed-toolbar { flex-direction: column; gap: 0.5rem; }

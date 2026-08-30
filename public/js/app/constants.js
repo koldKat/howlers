@@ -1,4 +1,5 @@
 export const TOKEN_KEY = 'howlers_webapp_token';
+export const COPYRIGHT_START_YEAR = 2026;
 
 export const MAX_POST_PHOTO_BYTES = 512 * 1024;
 export const MAX_POST_PHOTO_DIMENSION = 1600;
