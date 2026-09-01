@@ -593,7 +593,7 @@ async function main() {
       childName: 'Niki',
       title: 'Beta entry',
       quote: '',
-      story: 'Before merge',
+      story: 'Before [b]merge[/b] :happy:',
       category: 'did',
       happenedOn: '',
       mood: 'sweet',
@@ -791,6 +791,8 @@ async function main() {
   assert.doesNotMatch(result.body, /<button hidden id="post-detail-share"/);
   assert.doesNotMatch(result.body, /shared/);
   assert.doesNotMatch(result.body, /id="post-detail-title"/);
+  assert.match(result.body, /<strong><svg class="inline-emoticon"[^>]*><use href="\/emoticons\.svg#laugh"><\/use><\/svg> by beta<\/strong>/);
+  assert.match(result.body, /Shared <u><svg class="inline-emoticon"[^>]*><use href="\/emoticons\.svg#surprised"><\/use><\/svg><\/u>/);
 
   result = await request(privateSharePath, { raw: true });
   assert.equal(result.status, 200);
@@ -806,6 +808,7 @@ async function main() {
   assert.doesNotMatch(result.body, /id="post-detail-title"/);
   assert.match(result.body, /id="initial-post-detail"/);
   assert.match(result.body, new RegExp(privateShareToken));
+  assert.match(result.body, /Before <strong>merge<\/strong> <svg class="inline-emoticon"[^>]*><use href="\/emoticons\.svg#happy"><\/use><\/svg>/);
 
   result = await request('/shared/not-a-valid-token', { raw: true });
   assert.equal(result.status, 404);

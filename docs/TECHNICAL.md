@@ -69,6 +69,7 @@ Server composition:
 - `server/export.js`: TXT and print/PDF export rendering
 - `server/image-validation.js`: raster data URL size and signature checks
 - `server/howler-validation.js`: entry normalization and validation
+- `server/inline-content.js`: safe server-side formatting and SVG emoticon rendering for direct pages and print export
 - `server/backup.js`: hourly ZIP creation and 14-day retention
 - `server/routes/session.js`: registration, login, password reset, logout, state, export, and SSE handlers
 - `server/routes/profile.js`: profile, avatar, and password handlers
@@ -364,7 +365,7 @@ The shared-post dialog keeps the entry title only inside the entry card. Its com
 
 Hydrated post details preserve the server view's semantic `h1`. Closing a direct detail route restores the root title, canonical link, description, and Open Graph metadata, and removes detail-only robots, referrer, and JSON-LD elements. Reopening the mobile editor resets its scroll container to the top before it becomes visible.
 
-Direct `/posts/:id` and `/shared/:token` responses mark their populated dialog with `data-server-rendered`. CSS fixes that dialog above the app with an opaque viewport-covering shadow before JavaScript runs. During boot, `openInitialRoute()` consumes the embedded entry immediately after localization and before authentication or feed loading. The main feed then hydrates behind the already visible modal, so a direct share hit presents the requested post first while retaining instant close-to-feed navigation.
+Direct `/posts/:id` and `/shared/:token` responses mark their populated dialog with `data-server-rendered`. The server uses the same safe formatting renderer as print export, so supported text markers and SVG emoticons are visible before JavaScript runs. CSS fixes that dialog above the app with an opaque viewport-covering shadow before JavaScript runs. During boot, `openInitialRoute()` consumes the embedded entry immediately after localization and before authentication or feed loading. The main feed then hydrates behind the already visible modal, so a direct share hit presents the requested post first while retaining instant close-to-feed navigation. Optional footer nodes are guarded during startup, allowing a newly deployed client to hydrate an older in-memory server shell during a rolling restart.
 
 The CSS uses three responsive ranges:
 

@@ -54,9 +54,11 @@ const authController = createAuthController(els, {
 });
 
 const copyrightYear = new Date().getFullYear();
-els.copyrightYear.textContent = copyrightYear > COPYRIGHT_START_YEAR
-  ? `© ${COPYRIGHT_START_YEAR}-${copyrightYear}`
-  : `© ${COPYRIGHT_START_YEAR}`;
+if (els.copyrightYear) {
+  els.copyrightYear.textContent = copyrightYear > COPYRIGHT_START_YEAR
+    ? `© ${COPYRIGHT_START_YEAR}-${copyrightYear}`
+    : `© ${COPYRIGHT_START_YEAR}`;
+}
 
 // ── Auth state ──────────────────────────────────────────────
 

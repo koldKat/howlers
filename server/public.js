@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 const { PORT } = require('./config');
+const { renderInlineContent } = require('./inline-content');
 
 const APP_SHELL = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
@@ -37,8 +38,8 @@ function renderServerEntry(entry) {
   const title = stripEntryMarkup(entry.title) || entry.title;
   const meta = [entry.childName, entry.happenedOn, entry.ageNote].filter(Boolean).map(escHtml).join(' &bull; ');
   return `<article class="list-item post-detail-entry">
-    <div class="list-item-head"><div><h1 class="list-item-title">${escHtml(title)}</h1><div class="meta-line">${meta}</div></div></div>
-    ${entry.content ? `<div class="entry-content">${escHtml(stripEntryMarkup(entry.content)).replace(/\n/g, '<br>')}</div>` : ''}
+    <div class="list-item-head"><div><h1 class="list-item-title">${renderInlineContent(entry.title)}</h1><div class="meta-line">${meta}</div></div></div>
+    ${entry.content ? `<div class="entry-content">${renderInlineContent(entry.content)}</div>` : ''}
     ${entry.photo ? `<img class="entry-photo" src="${escHtml(entry.photo)}" alt="${escHtml(`Снимка към ${title}`)}">` : ''}
   </article>`;
 }
