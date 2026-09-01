@@ -8,9 +8,25 @@ export function escapeHtml(str) {
 
 export function formatDate(value) {
   if (!value) return '';
-  const date = new Date(value.includes('T') ? value : `${value}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('bg-BG', { year: 'numeric', month: 'short', day: 'numeric' });
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value;
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+export function parseDateInput(value) {
+  const input = String(value || '').trim();
+  if (!input) return '';
+  const iso = input.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const local = input.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$/);
+  const year = Number(iso?.[1] || local?.[3]);
+  const month = Number(iso?.[2] || local?.[2]);
+  const day = Number(iso?.[3] || local?.[1]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)
+    || date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return input;
+  }
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 export function dataUrlBytes(dataUrl) {

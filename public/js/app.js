@@ -7,7 +7,7 @@ import { bindBackdropDismiss, getAppElements } from './app/dom.js';
 import { createEditorTools } from './app/editor-tools.js';
 import { createFeedController } from './app/feed.js';
 import { createFeedLoader } from './app/feed-loading.js';
-import { formatDate } from './app/format.js';
+import { formatDate, parseDateInput } from './app/format.js';
 import { createKidsController } from './app/kids.js';
 import { createPostDetailController } from './app/post-detail.js';
 import { createProfileController } from './app/profile.js';
@@ -180,7 +180,7 @@ function markEditorValidationError(field) {
 function entryPayload() {
   return {
     childNames: childPicker.selectedNames(),
-    happenedOn: els.happenedOn.value,
+    happenedOn: parseDateInput(els.happenedOn.value),
     title: els.title.value.trim(),
     category: els.category.value,
     mood: els.mood.value,

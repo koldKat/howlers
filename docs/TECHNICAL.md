@@ -254,7 +254,7 @@ Authenticated state contains `app`, `viewer`, `profile`, `attention`, `summary`,
 
 Current entry input uses `childNames` and `content`. Legacy `childName`, `quote`, and `story` input remains accepted. Every entry requires at least one child name and either non-empty text or a valid photo. A missing title is accepted for photo entries and normalized to `Снимка`. Child names are deduplicated case-insensitively and a request may contain up to 20 names. Empty category and mood use `said` and `golden`; non-empty values must be in the fixed lists from `public/js/app/constants.js`.
 
-New entries without `happenedOn` receive the server's current local date. Updates do not add a date to an intentionally undated old entry.
+New entries without `happenedOn` receive the server's current local date. Native browser date controls use ISO `YYYY-MM-DD` values for the API and storage. Rendered entry dates, direct pages, exports, and admin timestamps display dates as `dd/mm/yyyy`. Updates do not add a date to an intentionally undated old entry.
 
 Private and public feed queries sort by immutable `created_at DESC, id DESC`. `happened_on` is event metadata only and does not affect feed position. Updating an entry changes `updated_at` but does not move it to the top of the feed.
 
@@ -343,7 +343,7 @@ Recovery is manual. Stop the server, preserve the current database files, extrac
 
 ## Public pages and SEO
 
-Public entry pages use `/posts/:id` and include canonical metadata, Open Graph fields, JSON-LD article data, and the normal application shell. Only public entries are included in the sitemap.
+The home page uses Bulgarian title, description, Open Graph metadata, PWA metadata, and `WebSite` JSON-LD that explicitly describe it as a place for детски бисери, смешни детски реплики, and family stories. Public entry pages use `/posts/:id` and include canonical metadata, Open Graph fields, JSON-LD article data, and the normal application shell. Only public entries are included in the sitemap.
 
 Private entries are shared through `/shared/:token`. The token is 24 cryptographically random bytes encoded as a 32-character base64url value and protected by a partial unique database index. Conditional creation prevents simultaneous share requests from replacing a token that another request just returned. The token is created only by the authenticated share endpoint, remains stable for later shares, and is never included in state, feed, SSE, or sitemap payloads. The link is intentionally accessible without login to anyone who knows it. Both the HTML response header and page metadata mark it `noindex, nofollow`. The response also uses `Cache-Control: private, no-store` and `Referrer-Policy: no-referrer`; the JSON link endpoint and private-entry API are non-cacheable as well. `/shared/` is not blocked in `robots.txt`, because a crawler must be allowed to fetch the response before it can honor `noindex`. Private numeric `/posts/:id` routes still return `404`.
 

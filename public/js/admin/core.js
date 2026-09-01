@@ -21,7 +21,13 @@ export function fmtUptime(seconds) {
 export function fmtDate(unixSeconds) {
   if (!unixSeconds) return '<span class="cell-muted">-</span>';
   const d = new Date(Number(unixSeconds) * 1000);
-  return `${d.toLocaleDateString()} <span class="cell-muted">${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>`;
+  const date = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  return `${date} <span class="cell-muted">${d.toLocaleTimeString('bg-BG', { hour: '2-digit', minute: '2-digit' })}</span>`;
+}
+
+export function fmtLocalDate(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : '-';
 }
 
 export function esc(str) {

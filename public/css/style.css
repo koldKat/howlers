@@ -115,14 +115,6 @@ select {
   background-size: 6px 6px, 6px 6px, 100% 100%;
   background-repeat: no-repeat;
 }
-input[type="date"] {
-  color-scheme: light;
-}
-input[type="date"]::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  opacity: 0.85;
-  filter: sepia(1) saturate(4) hue-rotate(332deg) brightness(1.02);
-}
 
 /* ── Navigation bar ── */
 .site-nav {
@@ -1412,4 +1404,12 @@ body.editor-open, body.profile-open { overflow: hidden; }
   /* Stack confirm actions vertically */
   .confirm-actions { flex-direction: column-reverse; }
   #confirm-cancel, #confirm-ok { width: 100%; text-align: center; }
+}
+input[type="date"] {
+  color-scheme: light;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.85;
+  filter: sepia(1) saturate(4) hue-rotate(332deg) brightness(1.02);
 }

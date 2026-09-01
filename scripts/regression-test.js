@@ -8,6 +8,7 @@ const path = require('path');
 const crypto = require('crypto');
 const Database = require('better-sqlite3');
 const { buildMultiChildAgeNote } = require('../server/entry-ages');
+const { formatBulgarianDate } = require('../server/date-validation');
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'howlers-regression-'));
 const databasePath = path.join(tempDir, 'database.sqlite');
@@ -97,6 +98,8 @@ function localDateString(date = new Date()) {
 }
 
 async function main() {
+  assert.equal(formatBulgarianDate('2026-09-02'), '02/09/2026');
+  assert.equal(formatBulgarianDate('invalid'), 'invalid');
   assert.equal(buildMultiChildAgeNote(
     ['Mila', 'Niki'],
     [{ name: 'Mila', dob: '2022-01-15' }, { name: 'Niki', dob: '2021-05-04' }],
@@ -106,6 +109,11 @@ async function main() {
 
   let result = await request('/', { raw: true });
   assert.equal(result.status, 200);
+  assert.match(result.body, /<title>Детски бисери и семейни истории \| Семейни бисери<\/title>/);
+  assert.match(result.body, /<meta name="description" content="Детски бисери, смешни детски реплики/);
+  assert.match(result.body, /"@type":"WebSite"/);
+  assert.match(result.body, /<input type="date" id="happened-on" lang="bg"/);
+  assert.match(result.body, /<input type="date" id="kid-dob-input" lang="bg"/);
   assert.match(result.body, /<nav class="site-nav">[\s\S]*id="mobile-family-settings"[\s\S]*<\/nav>/);
   assert.match(result.body, /class="mobile-family-settings-icon"/);
   assert.match(result.body, /id="mobile-family-settings-close"/);
@@ -449,7 +457,7 @@ async function main() {
     body: entryBody({ happenedOn: '2026-02-30' }),
   });
   assert.equal(result.status, 400);
-  assert.equal(result.body.error, 'Въведи валидна дата във формат ГГГГ-ММ-ДД.');
+  assert.equal(result.body.error, 'Въведи валидна дата във формат ДД/ММ/ГГГГ.');
 
   result = await request('/api/howlers', {
     token: alpha,
@@ -576,7 +584,7 @@ async function main() {
     body: { name: 'Impossible birthday', dob: '2021-02-30' },
   });
   assert.equal(result.status, 400);
-  assert.equal(result.body.error, 'Въведи валидна дата на раждане във формат ГГГГ-ММ-ДД.');
+  assert.equal(result.body.error, 'Въведи валидна дата на раждане във формат ДД/ММ/ГГГГ.');
 
   result = await request('/api/kids', {
     token: beta,
@@ -787,6 +795,7 @@ async function main() {
   assert.match(result.body, /Семейни бисери/);
   assert.match(result.body, /"datePublished":"\d{4}-\d{2}-\d{2}T/);
   assert.match(result.body, /data-server-rendered="true"/);
+  assert.match(result.body, /class="meta-line">[^<]*\d{2}\/\d{2}\/\d{4}/);
   assert.match(result.body, /<button id="post-detail-share"/);
   assert.doesNotMatch(result.body, /<button hidden id="post-detail-share"/);
   assert.doesNotMatch(result.body, /shared/);

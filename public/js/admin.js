@@ -1,4 +1,4 @@
-import { apiJson, esc, fmtDate, fmtSize, fmtUptime, numCell } from './admin/core.js';
+import { apiJson, esc, fmtDate, fmtLocalDate, fmtSize, fmtUptime, numCell } from './admin/core.js';
 import { createConfirmDialog, createToast } from './admin/dialogs.js';
 
 const toast = createToast();
@@ -70,7 +70,7 @@ function renderEntries() {
       <td class="admin-entry-title" data-tooltip="${esc(e.title)}"><span>${esc(e.title)}</span></td>
       <td><span class="pill pill-private">${esc(e.category)}</span></td>
       <td class="cell-muted">${esc(e.mood)}</td>
-      <td class="cell-muted" style="white-space:nowrap">${esc(e.happenedOn || '-')}</td>
+      <td class="cell-muted" style="white-space:nowrap">${esc(fmtLocalDate(e.happenedOn))}</td>
       <td style="white-space:nowrap">${fmtDate(e.updatedAt)}</td>
       <td class="center-col">
         <span class="pill ${e.isPublic ? 'pill-public' : 'pill-private'}">${e.isPublic ? 'Публичен' : 'Личен'}</span>

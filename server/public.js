@@ -5,6 +5,7 @@ const path = require('path');
 const db = require('./db');
 const { PORT } = require('./config');
 const { renderInlineContent } = require('./inline-content');
+const { formatBulgarianDate } = require('./date-validation');
 
 const APP_SHELL = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
@@ -36,7 +37,7 @@ function entryDescription(entry) {
 
 function renderServerEntry(entry) {
   const title = stripEntryMarkup(entry.title) || entry.title;
-  const meta = [entry.childName, entry.happenedOn, entry.ageNote].filter(Boolean).map(escHtml).join(' &bull; ');
+  const meta = [entry.childName, formatBulgarianDate(entry.happenedOn), entry.ageNote].filter(Boolean).map(escHtml).join(' &bull; ');
   return `<article class="list-item post-detail-entry">
     <div class="list-item-head"><div><h1 class="list-item-title">${renderInlineContent(entry.title)}</h1><div class="meta-line">${meta}</div></div></div>
     ${entry.content ? `<div class="entry-content">${renderInlineContent(entry.content)}</div>` : ''}
@@ -64,10 +65,10 @@ function renderEntryShell(req, entry, routePath, indexable) {
     headExtras.push(`<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>`);
   }
   let html = APP_SHELL
-    .replace('<title>Семейни бисери</title>', `<title>${escHtml(title)}</title>`)
+    .replace('<title>Детски бисери и семейни истории | Семейни бисери</title>', `<title>${escHtml(title)}</title>`)
     .replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${escHtml(description)}">`)
     .replace('<meta property="og:type" content="website">', '<meta property="og:type" content="article">')
-    .replace('<meta property="og:title" content="Семейни бисери">', `<meta property="og:title" content="${escHtml(title)}">`)
+    .replace('<meta property="og:title" content="Детски бисери и семейни истории | Семейни бисери">', `<meta property="og:title" content="${escHtml(title)}">`)
     .replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${escHtml(description)}">`)
     .replace('<link rel="canonical" href="/">', `<link rel="canonical" href="${escHtml(canonical)}">`)
     .replace('</head>', `  ${headExtras.filter(Boolean).join('\n  ')}\n</head>`)

@@ -1,7 +1,7 @@
 import { t } from '../i18n.js';
 import { apiFetch } from './api.js';
 import { calculateAgeAtDate } from './child-picker.js';
-import { escapeHtml } from './format.js';
+import { escapeHtml, formatDate, parseDateInput } from './format.js';
 
 export function createKidsController(els, { childPicker, askConfirm }) {
   let kids = [];
@@ -15,7 +15,7 @@ export function createKidsController(els, { childPicker, askConfirm }) {
     }
     els.kidsPanelList.innerHTML = kids.map(kid => {
       const age = calculateAgeAtDate(kid.dob);
-      const dobLabel = kid.dob ? ` \u2022 ${kid.dob}${age ? ` (${age})` : ''}` : '';
+      const dobLabel = kid.dob ? ` \u2022 ${formatDate(kid.dob)}${age ? ` (${age})` : ''}` : '';
       return `<div class="kid-row">
         <span class="kid-name">${escapeHtml(kid.name)}</span>
         <span class="kid-dob">${escapeHtml(dobLabel)}</span>
@@ -35,7 +35,7 @@ export function createKidsController(els, { childPicker, askConfirm }) {
     try {
       await apiFetch('/api/kids', {
         method: 'POST',
-        body: JSON.stringify({ name, dob: els.kidDobInput.value || '' }),
+        body: JSON.stringify({ name, dob: parseDateInput(els.kidDobInput.value) }),
       });
       els.kidNameInput.value = '';
       els.kidDobInput.value = '';

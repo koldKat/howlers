@@ -49,7 +49,7 @@ function validateHowler(body) {
     if (photoError) return { error: photoError, field: 'photo' };
   }
   if (happenedOn && !isValidLocalDate(happenedOn)) {
-    return { error: 'Въведи валидна дата във формат ГГГГ-ММ-ДД.', field: 'date' };
+    return { error: 'Въведи валидна дата във формат ДД/ММ/ГГГГ.', field: 'date' };
   }
 
   return {

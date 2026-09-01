@@ -108,7 +108,7 @@ function createKid(userId, { name, dob }) {
   if (cleanName.length > 60) throw new Error('Името трябва да е до 60 символа.');
   const cleanDob = String(dob || '').trim();
   if (cleanDob && !isValidLocalDate(cleanDob)) {
-    throw new Error('Въведи валидна дата на раждане във формат ГГГГ-ММ-ДД.');
+    throw new Error('Въведи валидна дата на раждане във формат ДД/ММ/ГГГГ.');
   }
   const result = db.prepare('INSERT INTO kids (user_id, family_id, name, dob) VALUES (?, ?, ?, ?)')
     .run(userId, familyId, cleanName, cleanDob);

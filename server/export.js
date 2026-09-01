@@ -3,6 +3,7 @@
 const db = require('./db');
 const { send } = require('./http');
 const { renderInlineContent } = require('./inline-content');
+const { formatBulgarianDate } = require('./date-validation');
 
 function escapeHtml(value) {
   return String(value || '')
@@ -21,7 +22,7 @@ function sendTxtExport(req, res, session, entries) {
     lines.push('');
     lines.push(`Заглавие:   ${e.title}`);
     if (e.childName) lines.push(`Дете:       ${e.childName}`);
-    if (e.happenedOn) lines.push(`Дата:       ${e.happenedOn}`);
+    if (e.happenedOn) lines.push(`Дата:       ${formatBulgarianDate(e.happenedOn)}`);
     if (e.ageNote) lines.push(`Възраст:    ${e.ageNote}`);
     if (e.category) lines.push(`Категория:  ${e.category}`);
     if (e.mood) lines.push(`Настроение: ${e.mood}`);
@@ -44,7 +45,7 @@ function sendPrintExport(res, session, entries) {
         <div class="card-head">
           <div>
             <div class="card-title">${renderInlineContent(e.title)}</div>
-            <div class="card-meta">${[e.childName, e.happenedOn, e.ageNote].filter(Boolean).map(escapeHtml).join(' · ')}</div>
+            <div class="card-meta">${[e.childName, formatBulgarianDate(e.happenedOn), e.ageNote].filter(Boolean).map(escapeHtml).join(' · ')}</div>
           </div>
           ${e.category ? `<span class="badge">${escapeHtml(e.category)}</span>` : ''}
         </div>

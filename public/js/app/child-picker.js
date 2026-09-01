@@ -1,5 +1,5 @@
 import { t } from '../i18n.js';
-import { escapeHtml } from './format.js';
+import { escapeHtml, parseDateInput } from './format.js';
 
 function normalizeName(value) {
   return String(value || '').trim().toLocaleLowerCase('bg-BG');
@@ -66,7 +66,7 @@ export function createChildPicker({ container, customInput, ageNoteInput, agePre
     const selectedKids = selectedKnownKids();
     const selectedCount = selectedKids.length + customNames().length;
     const ages = selectedKids
-      .map(kid => ({ kid, age: calculateAgeAtDate(kid.dob, happenedOnInput.value) }))
+      .map(kid => ({ kid, age: calculateAgeAtDate(kid.dob, parseDateInput(happenedOnInput.value)) }))
       .filter(item => item.age);
     if (!ages.length) {
       clearAutoAgeNote();
