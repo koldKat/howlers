@@ -212,7 +212,7 @@ async function main() {
   assert.match(result.body, /<meta name="theme-color" content="#57b9ff">/);
   assert.match(result.body, /class="feed-loading" role="status" aria-live="polite"/);
   assert.match(result.body, /class="panel-head editor-dialog-head"/);
-  assert.match(result.body, /class="app-footer" aria-label="Copyright">[\s\S]*class="app-footer-content">[\s\S]*class="app-footer-brand">koldKat productions<[\s\S]*data-copyright-year>© 2026/);
+  assert.match(result.body, /class="app-footer" aria-label="Copyright">[\s\S]*class="app-footer-content">[\s\S]*class="footer-studio">[\s\S]*class="app-footer-brand" tabindex="0"[\s\S]*data-copyright-year>© 2026[\s\S]*https:\/\/pathmap\.net[\s\S]*https:\/\/gamekat\.net/);
   assert.equal((result.body.match(/class="text-format-toolbar"/g) || []).length, 1);
   assert.equal((result.body.match(/class="inline-emote-picker"/g) || []).length, 1);
   assert.ok(result.body.includes('class="editor-inline-tools"'));
