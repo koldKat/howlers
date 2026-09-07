@@ -20,7 +20,6 @@
 </head>
 <body>
 
-  <!-- ── Sticky nav bar ── -->
   <nav class="site-nav">
     <div class="nav-inner">
       <div class="nav-brand">
@@ -51,11 +50,8 @@
     </div>
   </nav>
 
-  <!-- ── Page body ── -->
-  <div class="page-layout" id="page-layout">
-
-    <!-- Feed column (always visible) -->
-    <div class="feed-col">
+  <main class="page-layout" id="page-layout">
+    <section class="feed-col" aria-label="Публична лента">
       <div class="feed-toolbar" id="feed-toolbar" style="display:none">
         <input type="search" id="search-input" data-i18n-placeholder="placeholder_search" placeholder="Търсене по дете, заглавие, реплика, история или таг">
       </div>
@@ -83,9 +79,8 @@
           <span data-i18n="feed_loading">Зареждане на моментите…</span>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Sidebar (logged-in only) -->
     <aside id="feed-sidebar" style="display:none">
       <div class="mobile-sidebar-head">
         <strong data-i18n="mobile_family_settings">Семейни настройки</strong>
@@ -148,7 +143,6 @@
 
     </aside>
 
-    <!-- Sidebar (guest only) -->
     <aside id="guest-sidebar" style="display:none">
       <div class="panel guest-promo-panel">
         <div class="panel-head">
@@ -191,15 +185,29 @@
       </div>
     </aside>
 
-  </div>
+  </main>
 
   <footer class="app-footer" aria-label="Copyright">
     <div class="app-footer-content">
-      <span class="footer-studio"><span class="app-footer-brand" tabindex="0" aria-describedby="footer-studio-links">koldKat productions</span><span id="app-footer-copy" data-copyright-year>© 2026</span><span id="footer-studio-links" class="footer-studio-links" role="tooltip"><a href="https://pathmap.net" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V5l14 4-14 4"/><path d="M9 13v6"/></svg><span><b>Pathmap.net // Gamebook Tracker</b><small>Map every branch of your gamebook playthroughs.</small></span><i aria-hidden="true">↗</i></a><a href="https://gamekat.net" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v5h4M9 12h6M9 16h6"/></svg><span><b>Game Kat·a·log</b><small>Keep your game library in one place.</small></span><i aria-hidden="true">↗</i></a></span></span>
+      <span class="footer-studio">
+        <span class="app-footer-brand" tabindex="0" aria-describedby="footer-studio-links">koldKat productions</span>
+        <span id="app-footer-copy" data-copyright-year>© 2026</span>
+        <span id="footer-studio-links" class="footer-studio-links" role="tooltip">
+          <a href="https://pathmap.net" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V5l14 4-14 4"/><path d="M9 13v6"/></svg>
+            <span><b>Pathmap.net // Gamebook Tracker</b><small>Map every branch of your gamebook playthroughs.</small></span>
+            <i aria-hidden="true">↗</i>
+          </a>
+          <a href="https://gamekat.net" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v5h4M9 12h6M9 16h6"/></svg>
+            <span><b>Game Kat·a·log</b><small>Keep your game library in one place.</small></span>
+            <i aria-hidden="true">↗</i>
+          </a>
+        </span>
+      </span>
     </div>
   </footer>
 
-  <!-- Public post detail dialog. Server-rendered share URLs populate the same shell. -->
   <dialog id="post-detail-dialog" class="post-detail-dialog" aria-labelledby="post-detail-eyebrow">
     <div class="post-detail-header">
       <p id="post-detail-eyebrow" class="eyebrow" data-i18n="post_detail_eyebrow">Споделен бисер</p>
@@ -212,8 +220,7 @@
     </div>
   </dialog>
 
-  <!-- ── Auth modal ── -->
-  <div id="auth-modal" style="display:none">
+  <div id="auth-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="auth-title">
     <div class="auth-card">
       <button id="close-auth-btn" class="modal-close-btn" type="button" aria-label="Затвори">&times;</button>
       <p class="eyebrow" data-i18n="auth_eyebrow">Личен дневник</p>
@@ -264,9 +271,8 @@
     </div>
   </div>
 
-  <!-- ── Confirm overlay ── -->
-  <div id="confirm-overlay">
-    <div id="confirm-dialog">
+  <div id="confirm-overlay" role="presentation">
+    <div id="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
       <div class="confirm-eyebrow" data-i18n="confirm_eyebrow">Потвърждаване</div>
       <h2 id="confirm-title">Изтриване на запис</h2>
       <p id="confirm-message">Това ще премахне избрания запис завинаги.</p>
@@ -277,9 +283,8 @@
     </div>
   </div>
 
-  <!-- ── Editor overlay ── -->
-  <div id="editor-overlay">
-    <div id="editor-dialog" class="panel">
+  <div id="editor-overlay" role="presentation">
+    <div id="editor-dialog" class="panel" role="dialog" aria-modal="true" aria-labelledby="editor-title">
       <div class="panel-head editor-dialog-head">
         <div class="dialog-heading">
           <h2 id="editor-title">Добави запис</h2>
@@ -378,11 +383,10 @@
     </div>
   </div>
 
-  <!-- ── Profile modal ── -->
-  <div id="profile-modal" style="display:none">
-    <div id="profile-card" class="profile-card panel">
+  <div id="profile-modal" style="display:none" role="presentation">
+    <div id="profile-card" class="profile-card panel" role="dialog" aria-modal="true" aria-labelledby="profile-title">
       <div class="panel-head">
-        <h2 data-i18n="profile_title">Моят профил</h2>
+        <h2 id="profile-title" data-i18n="profile_title">Моят профил</h2>
         <button id="close-profile-btn" class="modal-close-btn" type="button" aria-label="Затвори">&times;</button>
       </div>
 
