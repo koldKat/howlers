@@ -5,6 +5,7 @@ const { PROTECTED_ADMIN_USERS } = require('../config');
 const { readBody, send, isLocalhost } = require('../http');
 const { serveFile } = require('../static');
 const mailer = require('../mailer');
+const domain = require('../../shared/domain');
 
 function createAdminHandlers({ sseHub }) {
   function requireLocal(req, res) {
@@ -113,7 +114,7 @@ function createAdminHandlers({ sseHub }) {
       const settings = mailer.publicSettings();
       await mailer.send({
         to: String(input.to || settings.sender || ''),
-        subject: 'Тест на имейла от Семейни бисери',
+        subject: `Тест на имейла от ${domain.brand.name}`,
         text: 'Изпращането на имейли е настроено правилно.',
       });
       send(res, 200, { ok: true });

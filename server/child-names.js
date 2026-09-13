@@ -1,7 +1,8 @@
 'use strict';
 
 const MAX_CHILDREN_PER_ENTRY = 20;
-const MAX_CHILD_NAME_LENGTH = 60;
+const { limits } = require('../shared/domain');
+const MAX_CHILD_NAME_LENGTH = limits.maxChildNameLength;
 
 function deduplicateChildNames(values) {
   const childNames = [];

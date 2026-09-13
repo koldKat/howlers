@@ -3,12 +3,15 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { MIME, ROOT } = require('./config');
+const { APP_ROOT, MIME, ROOT } = require('./config');
+const DOMAIN_SCRIPT = path.join(APP_ROOT, 'shared', 'domain.js');
 
 function serveFile(req, res, pathname) {
   const cleanPath = pathname === '/' ? '/index.html' : pathname;
-  const filePath = path.resolve(ROOT, cleanPath.replace(/^\/+/, ''));
-  if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) {
+  const filePath = pathname === '/js/domain.js'
+    ? DOMAIN_SCRIPT
+    : path.resolve(ROOT, cleanPath.replace(/^\/+/, ''));
+  if (filePath !== DOMAIN_SCRIPT && filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Забранен достъп');
     return;

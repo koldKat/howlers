@@ -1,5 +1,6 @@
 const db = require('./connection');
 const { isValidLocalDate } = require('../date-validation');
+const { limits } = require('../../shared/domain');
 
 function createFamilyForUser(userId) {
   const existing = db.prepare('SELECT family_id FROM family_members WHERE user_id = ?').get(userId);
@@ -105,7 +106,7 @@ function createKid(userId, { name, dob }) {
   const familyId = getFamilyIdForUser(userId);
   const cleanName = String(name || '').trim();
   if (!cleanName) throw new Error('Името е задължително.');
-  if (cleanName.length > 60) throw new Error('Името трябва да е до 60 символа.');
+  if (cleanName.length > limits.maxChildNameLength) throw new Error(`Името трябва да е до ${limits.maxChildNameLength} символа.`);
   const cleanDob = String(dob || '').trim();
   if (cleanDob && !isValidLocalDate(cleanDob)) {
     throw new Error('Въведи валидна дата на раждане във формат ДД/ММ/ГГГГ.');

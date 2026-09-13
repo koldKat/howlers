@@ -3,6 +3,7 @@
 const net = require('node:net');
 const tls = require('node:tls');
 const crypto = require('node:crypto');
+const domain = require('../shared/domain');
 const { once } = require('node:events');
 const db = require('./db/connection');
 
@@ -116,7 +117,7 @@ async function openSocket(config) {
 
 function message({ config, to, subject, text, html = '' }) {
   const headers = [
-    `From: ${encodeHeader('Семейни бисери')} <${config.sender}>`,
+    `From: ${encodeHeader(domain.brand.name)} <${config.sender}>`,
     `To: ${to}`,
     `Subject: ${encodeHeader(subject)}`,
     'MIME-Version: 1.0',

@@ -4,9 +4,11 @@ const { MAX_POST_PHOTO_BYTES } = require('./config');
 const { childNamesFromInput } = require('./child-names');
 const { isValidLocalDate } = require('./date-validation');
 const { validateRasterImageDataUrl } = require('./image-validation');
+const domain = require('../shared/domain');
 
-const VALID_CATEGORIES = new Set(['said', 'did', 'mixed', 'milestone', 'oops', 'wisdom', 'art', 'bedtime']);
-const VALID_MOODS = new Set(['golden', 'chaotic', 'sweet', 'legendary', 'hilarious', 'heartwarming', 'facepalm', 'proud', 'bittersweet']);
+const VALID_CATEGORIES = new Set(domain.categories);
+const VALID_MOODS = new Set(domain.moods);
+const { limits } = domain;
 
 function normalizeCategory(value) {
   return value || 'said';
@@ -38,10 +40,10 @@ function validateHowler(body) {
   if (!title && photo) title = 'Снимка';
   if (!title) return { error: 'Заглавието е задължително.', field: 'title' };
   if (!quote && !story && !photo) return { error: 'Добави текст или снимка към записа.', field: 'content' };
-  if (title.length > 120) return { error: 'Заглавието е прекалено дълго.', field: 'title' };
-  if (hasCombinedContent && content.length > 5000) return { error: 'Текстът на записа е прекалено дълъг.', field: 'content' };
-  if (!hasCombinedContent && quote.length > 800) return { error: 'Репликата е прекалено дълга.', field: 'content' };
-  if (!hasCombinedContent && story.length > 4000) return { error: 'Историята е прекалено дълга.', field: 'content' };
+  if (title.length > limits.maxEntryTitleLength) return { error: 'Заглавието е прекалено дълго.', field: 'title' };
+  if (hasCombinedContent && content.length > limits.maxEntryContentLength) return { error: 'Текстът на записа е прекалено дълъг.', field: 'content' };
+  if (!hasCombinedContent && quote.length > limits.maxLegacyQuoteLength) return { error: 'Репликата е прекалено дълга.', field: 'content' };
+  if (!hasCombinedContent && story.length > limits.maxLegacyStoryLength) return { error: 'Историята е прекалено дълга.', field: 'content' };
   if (!VALID_CATEGORIES.has(category)) return { error: 'Невалиден вид на записа.', field: 'category' };
   if (!VALID_MOODS.has(mood)) return { error: 'Невалидно настроение.', field: 'mood' };
   if (photo) {

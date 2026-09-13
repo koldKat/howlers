@@ -1,12 +1,13 @@
 'use strict';
 
 const db = require('./db');
+const domain = require('../shared/domain');
 
 function appInfo() {
   return {
-    name: 'Семейни бисери',
+    name: domain.brand.name,
     version: '1.0.0',
-    subtitle: 'Реплики, случки и малки легенди',
+    subtitle: domain.brand.subtitle,
   };
 }
 

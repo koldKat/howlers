@@ -7,6 +7,7 @@ const {
   PASSWORD_RESET_SECONDS,
   PROTECTED_ADMIN_USERS,
 } = require('../config');
+const { limits } = require('../../shared/domain');
 const {
   createFamilyForUser,
   listFamilyInvites,
@@ -129,7 +130,7 @@ function storePasswordReset(reset) {
 
 async function resetPassword(token, password) {
   const cleanPassword = typeof password === 'string' ? password : '';
-  if (cleanPassword.length < 6 || cleanPassword.length > 256) {
+  if (cleanPassword.length < limits.minPasswordLength || cleanPassword.length > limits.maxPasswordLength) {
     const error = new Error('Паролата трябва да е между 6 и 256 символа.');
     error.statusCode = 400;
     throw error;
@@ -216,7 +217,7 @@ function updateProfile(userId, { displayName, email }) {
   if (!current) throw new Error('Потребителят не е намерен.');
   const name = displayName === undefined
     ? current.display_name
-    : String(displayName || '').trim().slice(0, 60) || null;
+    : String(displayName || '').trim().slice(0, limits.maxDisplayNameLength) || null;
   const cleanEmail = email === undefined ? current.email : normalizeEmail(email);
   try {
     db.prepare('UPDATE users SET display_name = ?, email = ? WHERE id = ?').run(name, cleanEmail, userId);

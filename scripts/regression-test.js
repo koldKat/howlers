@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const Database = require('better-sqlite3');
 const { buildMultiChildAgeNote } = require('../server/entry-ages');
 const { formatBulgarianDate } = require('../server/date-validation');
+const domain = require('../shared/domain');
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'howlers-regression-'));
 const databasePath = path.join(tempDir, 'database.sqlite');
@@ -100,6 +101,9 @@ function localDateString(date = new Date()) {
 async function main() {
   assert.equal(formatBulgarianDate('2026-09-02'), '02/09/2026');
   assert.equal(formatBulgarianDate('invalid'), 'invalid');
+  assert.equal(domain.brand.name, 'Семейни бисери');
+  assert.ok(domain.categories.includes('said'));
+  assert.ok(domain.emoticons.includes('angry'));
   assert.equal(buildMultiChildAgeNote(
     ['Mila', 'Niki'],
     [{ name: 'Mila', dob: '2022-01-15' }, { name: 'Niki', dob: '2021-05-04' }],
@@ -112,6 +116,7 @@ async function main() {
   assert.match(result.body, /<title>Детски бисери и семейни истории \| Семейни бисери<\/title>/);
   assert.match(result.body, /<meta name="description" content="Детски бисери, смешни детски реплики/);
   assert.match(result.body, /"@type":"WebSite"/);
+  assert.match(result.body, /<script src="\/js\/domain\.js"><\/script>/);
   assert.match(result.body, /<input type="date" id="happened-on" lang="bg"/);
   assert.match(result.body, /<input type="date" id="kid-dob-input" lang="bg"/);
   assert.match(result.body, /<nav class="site-nav">[\s\S]*id="mobile-family-settings"[\s\S]*<\/nav>/);
@@ -128,6 +133,10 @@ async function main() {
   assert.match(result.body, /<symbol id="proud"/);
   assert.match(result.body, /<symbol id="angry"/);
   assert.match(result.body, /<symbol id="cool"/);
+
+  result = await request('/js/domain.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /HowlersDomain/);
 
   const staticResponse = await fetch(`${baseUrl}/js/app.js`);
   assert.equal(staticResponse.status, 200);
@@ -795,6 +804,8 @@ async function main() {
   assert.match(result.body, /Семейни бисери/);
   assert.match(result.body, /"datePublished":"\d{4}-\d{2}-\d{2}T/);
   assert.match(result.body, /data-server-rendered="true"/);
+  assert.match(result.body, /id="website-schema" type="application\/ld\+json"/);
+  assert.match(result.body, /id="post-detail-schema" type="application\/ld\+json"/);
   assert.match(result.body, /class="meta-line">[^<]*\d{2}\/\d{2}\/\d{4}/);
   assert.match(result.body, /<button id="post-detail-share"/);
   assert.doesNotMatch(result.body, /<button hidden id="post-detail-share"/);

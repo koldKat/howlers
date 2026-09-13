@@ -1,6 +1,7 @@
 import { t } from '../i18n.js';
 import {
   CATEGORY_SLUGS,
+  EMOTICON_ASSET,
   EMOTICON_SLUGS,
   MAX_POST_PHOTO_BYTES,
   MAX_POST_PHOTO_DIMENSION,
@@ -170,7 +171,7 @@ export function createEditorTools(elements) {
     document.querySelectorAll('.inline-emote-picker').forEach(picker => {
       picker.innerHTML = EMOTICON_SLUGS.map(slug => `
         <button class="inline-emote-btn" type="button" aria-label="${escapeHtml(emoticonLabel(slug))}" data-tooltip="${escapeHtml(emoticonLabel(slug))}" data-inline-emoticon="${slug}">
-          <svg viewBox="0 0 64 64" aria-hidden="true"><use href="/emoticons.svg#${slug}"></use></svg>
+          <svg viewBox="0 0 64 64" aria-hidden="true"><use href="${EMOTICON_ASSET}#${slug}"></use></svg>
         </button>
       `).join('');
     });

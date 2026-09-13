@@ -6,6 +6,7 @@ const db = require('./db');
 const { PORT } = require('./config');
 const { renderInlineContent } = require('./inline-content');
 const { formatBulgarianDate } = require('./date-validation');
+const domain = require('../shared/domain');
 
 const APP_SHELL = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
@@ -26,7 +27,7 @@ function escXml(value) {
 
 function stripEntryMarkup(value) {
   return String(value || '')
-    .replace(/:(happy|laugh|love|surprised|silly|proud|angry|sad|crying|worried|sleepy|cool):/g, '')
+    .replace(new RegExp(`:(${domain.emoticons.join('|')}):`, 'g'), '')
     .replace(/\[(\/?)(b|i|u|s)\]/g, '').replace(/\s+/g, ' ').trim();
 }
 
@@ -48,8 +49,8 @@ function renderServerEntry(entry) {
 function renderEntryShell(req, entry, routePath, indexable) {
   const canonical = `${absoluteBaseUrl(req)}${routePath}`;
   const entryTitle = stripEntryMarkup(entry.title) || entry.title;
-  const title = `${entryTitle} - Семейни бисери`;
-  const description = entryDescription(entry) || 'Споделен запис от архива „Семейни бисери“.';
+  const title = `${entryTitle} - ${domain.brand.name}`;
+  const description = entryDescription(entry) || `Споделен запис от архива „${domain.brand.name}“.`;
   const initialData = JSON.stringify({ ...entry, sharePath: routePath }).replace(/</g, '\\u003c');
   const headExtras = [
     `<meta property="og:url" content="${escHtml(canonical)}">`,
@@ -62,7 +63,7 @@ function renderEntryShell(req, entry, routePath, indexable) {
       dateModified: entry.updatedAt ? new Date(Number(entry.updatedAt) * 1000).toISOString() : undefined,
       mainEntityOfPage: canonical, isAccessibleForFree: true,
     };
-    headExtras.push(`<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>`);
+    headExtras.push(`<script id="post-detail-schema" type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>`);
   }
   let html = APP_SHELL
     .replace('<title>Детски бисери и семейни истории | Семейни бисери</title>', `<title>${escHtml(title)}</title>`)

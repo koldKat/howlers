@@ -4,6 +4,7 @@ const db = require('./db');
 const { send } = require('./http');
 const { renderInlineContent } = require('./inline-content');
 const { formatBulgarianDate } = require('./date-validation');
+const domain = require('../shared/domain');
 
 function escapeHtml(value) {
   return String(value || '')
@@ -15,7 +16,7 @@ function escapeHtml(value) {
 function sendTxtExport(req, res, session, entries) {
   const name = session.display_name || session.username;
   const lines = [];
-  lines.push(`Семейни бисери - ${name}`);
+  lines.push(`${domain.brand.name} - ${name}`);
   lines.push(`Изтеглено: ${new Date().toLocaleString('bg-BG')}`);
   lines.push('═'.repeat(60));
   for (const e of entries) {
@@ -58,7 +59,7 @@ function sendPrintExport(res, session, entries) {
   const html = `<!DOCTYPE html>
 <html lang="bg"><head>
 <meta charset="UTF-8">
-<title>Семейни бисери - ${escapeHtml(name)}</title>
+<title>${escapeHtml(domain.brand.name)} - ${escapeHtml(name)}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Georgia, serif; font-size: 13px; color: #2c1a0e; background: #fff; padding: 28px 36px; }
@@ -78,7 +79,7 @@ function sendPrintExport(res, session, entries) {
   @media print { body { padding: 0; } }
 </style>
 </head><body>
-<h1>Семейни бисери</h1>
+<h1>${escapeHtml(domain.brand.name)}</h1>
 <div class="subtitle">${escapeHtml(name)} · Изтеглено ${new Date().toLocaleDateString('bg-BG')}</div>
 ${cards}
 <script>window.addEventListener('load', () => window.print());<\/script>

@@ -2,15 +2,14 @@ import { t } from '../i18n.js';
 import { apiFetch } from './api.js';
 import { categoryClass, categoryLabel, entryMetaLine, renderInlineContent } from './entry-presentation.js';
 import { escapeHtml } from './format.js';
+import { APP_NAME, EMOTICON_TOKEN_RE, ROOT_DESCRIPTION, ROOT_OG_DESCRIPTION, ROOT_TITLE } from './constants.js';
 
 const POST_PATH_RE = /^\/posts\/(\d+)$/;
 const SHARED_PATH_RE = /^\/shared\/([A-Za-z0-9_-]{32})$/;
-const BASE_DESCRIPTION = 'Семейни бисери е публична лента и личен семеен архив за смешни детски реплики, истории и малки семейни легенди.';
-const BASE_OG_DESCRIPTION = 'Публична лента и личен семеен архив за смешни детски реплики, истории и малки семейни легенди.';
 
 function plainTitle(value) {
   return String(value || '')
-    .replace(/:(happy|laugh|love|surprised|silly|proud|angry|sad|crying|worried|sleepy|cool):/g, '')
+    .replace(EMOTICON_TOKEN_RE, '')
     .replace(/\[(\/?)(b|i|u|s)\]/g, '').trim();
 }
 
@@ -40,20 +39,20 @@ function detailRoute(pathname = window.location.pathname) {
 }
 
 export function createPostDetailController(elements) {
-  const baseTitle = 'Семейни бисери';
+  const baseTitle = APP_NAME;
   let currentEntry = initialServerEntry();
   let requestSequence = 0;
 
   function restoreBaseMetadata() {
     document.querySelector('link[rel="canonical"]')?.setAttribute('href', '/');
-    document.querySelector('meta[name="description"]')?.setAttribute('content', BASE_DESCRIPTION);
+    document.querySelector('meta[name="description"]')?.setAttribute('content', ROOT_DESCRIPTION);
     document.querySelector('meta[property="og:type"]')?.setAttribute('content', 'website');
-    document.querySelector('meta[property="og:title"]')?.setAttribute('content', baseTitle);
-    document.querySelector('meta[property="og:description"]')?.setAttribute('content', BASE_OG_DESCRIPTION);
+    document.querySelector('meta[property="og:title"]')?.setAttribute('content', ROOT_TITLE);
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', ROOT_OG_DESCRIPTION);
     document.querySelector('meta[property="og:url"]')?.remove();
     document.querySelector('meta[name="robots"]')?.remove();
     document.querySelector('meta[name="referrer"]')?.remove();
-    document.querySelector('script[type="application/ld+json"]')?.remove();
+    document.getElementById('post-detail-schema')?.remove();
   }
 
   function prepareDialog(canShare = true) {
@@ -81,7 +80,7 @@ export function createPostDetailController(elements) {
     if (elements.postDetailDialog.open) elements.postDetailDialog.close();
     document.body.classList.remove('post-detail-open');
     elements.postDetailShareStatus.textContent = '';
-    document.title = baseTitle;
+    document.title = ROOT_TITLE;
     restoreBaseMetadata();
     currentEntry = null;
   }

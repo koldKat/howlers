@@ -1,6 +1,7 @@
 import { t } from '../i18n.js';
 import { apiFetch, getToken } from './api.js';
 import { escapeHtml } from './format.js';
+import { MAX_AVATAR_BYTES, MIN_PASSWORD_LENGTH } from './constants.js';
 
 export function createProfileController(elements, { getViewer, setViewer, onFamilyAccepted, onOpen }) {
   let currentProfile = null;
@@ -187,7 +188,7 @@ export function createProfileController(elements, { getViewer, setViewer, onFami
     elements.profilePwError.className = 'inline-error';
     const currentPassword = elements.profileCurrentPw.value;
     const newPassword = elements.profileNewPw.value;
-    if (newPassword.length < 6) {
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
       elements.profilePwError.textContent = t('profile_error_password_too_short');
       return;
     }
@@ -308,7 +309,7 @@ export function createProfileController(elements, { getViewer, setViewer, onFami
     const file = event.target.files[0];
     event.target.value = '';
     if (!file) return;
-    if (file.size > 300 * 1024) {
+    if (file.size > MAX_AVATAR_BYTES) {
       elements.profileIdentityError.textContent = t('profile_error_avatar_too_large');
       return;
     }

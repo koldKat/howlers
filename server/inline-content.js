@@ -1,6 +1,7 @@
 'use strict';
 
-const EMOTICON_PATTERN = /:(happy|laugh|love|surprised|silly|proud|angry|sad|crying|worried|sleepy|cool):/g;
+const domain = require('../shared/domain');
+const EMOTICON_PATTERN = new RegExp(`:(${domain.emoticons.join('|')}):`, 'g');
 
 function escapeHtml(value) {
   return String(value || '')
@@ -15,7 +16,7 @@ function renderInlineContent(value) {
   let lastIndex = 0;
   text.replace(EMOTICON_PATTERN, (token, slug, offset) => {
     html += escapeHtml(text.slice(lastIndex, offset));
-    html += `<svg class="inline-emoticon" viewBox="0 0 64 64" aria-label="${escapeHtml(slug)}"><use href="/emoticons.svg#${slug}"></use></svg>`;
+    html += `<svg class="inline-emoticon" viewBox="0 0 64 64" aria-label="${escapeHtml(slug)}"><use href="${domain.assets.emoticons}#${slug}"></use></svg>`;
     lastIndex = offset + token.length;
     return token;
   });

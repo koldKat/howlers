@@ -4,6 +4,7 @@ const { readBody, send, tokenFromReq } = require('../http');
 const { buildState } = require('../state');
 const { handleExport: sendExport } = require('../export');
 const { PUBLIC_URL } = require('../config');
+const { brand, limits } = require('../../shared/domain');
 const {
   clientIp,
   isRateLimited,
@@ -40,12 +41,12 @@ function createSessionHandlers({ sseHub }) {
       send(res, 400, { error: 'Потребителското име и паролата са задължителни.' });
       return;
     }
-    if (cleanUsername.length > 60) {
+    if (cleanUsername.length > limits.maxUsernameLength) {
       recordFailure(ip);
       send(res, 400, { error: 'Потребителското име трябва да е до 60 символа.' });
       return;
     }
-    if (cleanPassword.length < 6 || cleanPassword.length > 256) {
+    if (cleanPassword.length < limits.minPasswordLength || cleanPassword.length > limits.maxPasswordLength) {
       recordFailure(ip);
       send(res, 400, { error: 'Паролата трябва да е между 6 и 256 символа.' });
       return;
@@ -101,7 +102,7 @@ function createSessionHandlers({ sseHub }) {
         const link = `${PUBLIC_URL}/?reset=${encodeURIComponent(reset.token)}`;
         await mailer.send({
           to: reset.email,
-          subject: 'Нова парола за Семейни бисери',
+          subject: `Нова парола за ${brand.name}`,
           text: `Здравей, ${reset.username}.\n\nИзползвай тази еднократна връзка, за да избереш нова парола:\n${link}\n\nВръзката важи един час.`,
           html: passwordResetEmail({ username: reset.username, link }),
         });

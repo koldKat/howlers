@@ -1,5 +1,5 @@
 import { t } from '../i18n.js';
-import { CATEGORY_SLUGS, EMOTICON_SLUGS, EMOTICON_TOKEN_RE, MOOD_SLUGS } from './constants.js';
+import { CATEGORY_SLUGS, EMOTICON_ASSET, EMOTICON_SLUGS, EMOTICON_TOKEN_RE, MOOD_SLUGS } from './constants.js';
 import { escapeHtml, formatDate } from './format.js';
 
 export function entryMetaLine(entry) {
@@ -39,7 +39,7 @@ export function emoticonLabel(slug) {
 
 export function emoticonSvg(slug, className = 'inline-emoticon') {
   if (!EMOTICON_SLUGS.includes(slug)) return '';
-  return `<svg class="${className}" viewBox="0 0 64 64" role="img" aria-label="${escapeHtml(emoticonLabel(slug))}"><use href="/emoticons.svg#${slug}"></use></svg>`;
+  return `<svg class="${className}" viewBox="0 0 64 64" role="img" aria-label="${escapeHtml(emoticonLabel(slug))}"><use href="${EMOTICON_ASSET}#${slug}"></use></svg>`;
 }
 
 export function renderInlineContent(value) {

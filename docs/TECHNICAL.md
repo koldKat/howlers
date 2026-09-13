@@ -48,6 +48,7 @@ Server composition:
 - `server.js`: process entry point, HTTP listener, SSE hub wiring, session cleanup, and backup startup
 - `server/app.js`: central request dispatcher and error boundary
 - `server/config.js`: paths, limits, backup policy, MIME types, and protected usernames
+- `shared/domain.js`: browser/server contract for brand copy, supported entry values, shared assets, and validation limits
 - `server/http.js`: JSON responses, bounded request parsing, token extraction, and localhost detection
 - `server/date-validation.js`: shared local date formatting and real calendar date validation
 - `server/entry-ages.js`: backward-compatible per-child age snapshots for multi-child entries
@@ -64,7 +65,7 @@ Server composition:
 - `server/child-names.js`: singular and multi-child compatibility normalization
 - `server/state.js`: authenticated and guest state builders
 - `server/sse.js`: live client registry and state publishing
-- `server/static.js`: static files under `public/`
+- `server/static.js`: static files under `public/` plus the shared browser/server domain module at `/js/domain.js`
 - `server/public.js`: public and private-link post HTML, sitemap, and robots output
 - `server/export.js`: TXT and print/PDF export rendering
 - `server/image-validation.js`: raster data URL size and signature checks
@@ -83,7 +84,7 @@ Browser code:
 - `public/site.webmanifest`, `public/favicon.svg`, and `public/icons/`: install metadata and app icon assets
 - `public/js/app.js`: application boot, auth lifecycle, editor submission, dialogs, and SSE orchestration
 - `public/js/app/api.js`: token storage and JSON API wrapper
-- `public/js/app/constants.js`: categories, moods, emoticons, formatting, and client upload limits
+- `public/js/app/constants.js`: browser access to shared domain values plus client-only formatting constants
 - `public/js/app/dom.js`: DOM references and backdrop dismissal
 - `public/js/app/child-picker.js`: multi-child selection and age-note calculation
 - `public/js/app/editor-tools.js`: cursor-aware shared formatting and emoticon controls, shortcuts, photo processing, and editor controls; the shared tool strip keeps formatting left and a horizontally scrollable emote row right without a visible scrollbar
@@ -100,6 +101,8 @@ Browser code:
 - `public/admin.html`, `public/js/admin.js`, `public/js/admin/*`, `public/css/admin.css`: admin panel
 
 The page footer follows the Gamebooks and games-app family branding: **koldKat productions** followed by a copyright year. It reuses the page grid but occupies only the feed column, so its text is centered under the feed rather than the viewport. Dark burnt orange and slate text keep the notice readable over the grass band. `COPYRIGHT_START_YEAR` is defined in `public/js/app/constants.js`; the browser keeps `2026` during the starting year and automatically expands it to a normal-hyphen year range later.
+
+`shared/domain.js` is the source of truth for brand copy used by runtime code, post categories and moods, emoticon slugs and asset path, and limits that must agree between the browser and server. It uses a small UMD wrapper: Node loads it with `require()`, while `index.html` loads `/js/domain.js` before the ES-module application. Static index metadata remains in HTML for crawlers. Direct post pages add `#post-detail-schema`; the client removes only that ID on close and preserves `#website-schema`.
 
 Documentation and verification:
 

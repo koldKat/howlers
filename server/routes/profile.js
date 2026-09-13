@@ -3,6 +3,7 @@ const { authenticate } = require('../auth');
 const { MAX_AVATAR_BYTES } = require('../config');
 const { readBody, send } = require('../http');
 const { validateRasterImageDataUrl } = require('../image-validation');
+const { limits } = require('../../shared/domain');
 
 function createProfileHandlers({ sseHub }) {
   async function get(req, res) {
@@ -18,7 +19,7 @@ function createProfileHandlers({ sseHub }) {
       send(res, 400, { error: 'Показваното име трябва да е текст.' });
       return;
     }
-    if (String(displayName || '').trim().length > 60) {
+    if (String(displayName || '').trim().length > limits.maxDisplayNameLength) {
       send(res, 400, { error: 'Показваното име трябва да е до 60 символа.' });
       return;
     }
@@ -40,7 +41,7 @@ function createProfileHandlers({ sseHub }) {
       send(res, 400, { error: 'Текущата и новата парола са задължителни.' });
       return;
     }
-    if (newPassword.length < 6 || newPassword.length > 256) {
+    if (newPassword.length < limits.minPasswordLength || newPassword.length > limits.maxPasswordLength) {
       send(res, 400, { error: 'Новата парола трябва да е между 6 и 256 символа.' });
       return;
     }
