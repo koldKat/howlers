@@ -9,6 +9,8 @@ import { createFeedController } from './app/feed.js';
 import { createFeedLoader } from './app/feed-loading.js';
 import { formatDate, parseDateInput } from './app/format.js';
 import { createKidsController } from './app/kids.js';
+import { createImageViewer } from './app/image-viewer.js';
+import { createDatePicker } from './app/date-picker.js';
 import { createPostDetailController } from './app/post-detail.js';
 import { createProfileController } from './app/profile.js';
 
@@ -46,6 +48,8 @@ const feedController = createFeedController(els, {
   onViewer: nextViewer => { viewer = { ...viewer, ...nextViewer }; },
 });
 const postDetailController = createPostDetailController(els);
+const imageViewer = createImageViewer(els);
+const datePicker = createDatePicker(els);
 const authController = createAuthController(els, {
   onAuthenticated: async token => {
     setToken(token);
@@ -218,7 +222,7 @@ function fillForm(entry) {
   els.entryId.value = String(entry.id);
   const childNames = entry.childNames?.length ? entry.childNames : [entry.childName].filter(Boolean);
   childPicker.setSelectedNames(childNames);
-  els.happenedOn.value = entry.happenedOn || '';
+  els.happenedOn.value = formatDate(entry.happenedOn);
   els.title.value = entry.title || '';
   els.category.value = entry.category || '';
   els.mood.value = entry.mood || '';
@@ -444,6 +448,8 @@ bindBackdropDismiss(els.authModal, authController.close);
 
 kidsController.bindEvents();
 postDetailController.bindEvents();
+imageViewer.bindEvents();
+datePicker.bindEvents();
 
 document.addEventListener('keydown', event => {
   if (event.key === 'Tab' && els.feedSidebar.classList.contains('mobile-open')) {
@@ -487,7 +493,7 @@ window.addEventListener('resize', () => {
 
 Object.entries(editorValidationFields).forEach(([field, controls]) => {
   controls.forEach(control => {
-    const eventName = control.matches('select, input[type="date"], input[type="checkbox"]') ? 'change' : 'input';
+    const eventName = control.matches('select, input[type="checkbox"]') ? 'change' : 'input';
     control.addEventListener(eventName, () => {
       clearEditorValidation(field);
       els.formError.textContent = '';

@@ -87,6 +87,7 @@ Browser code:
 - `public/js/app/constants.js`: browser access to shared domain values plus client-only formatting constants
 - `public/js/app/dom.js`: DOM references and backdrop dismissal
 - `public/js/app/child-picker.js`: multi-child selection and age-note calculation
+- `public/js/app/date-picker.js`: Bulgarian `dd/mm/yyyy` input masking and themed calendar dialog
 - `public/js/app/editor-tools.js`: cursor-aware shared formatting and emoticon controls, shortcuts, photo processing, and editor controls; the shared tool strip keeps formatting left and a horizontally scrollable emote row right without a visible scrollbar
 - `public/js/app/entry-presentation.js`: entry labels, metadata, inline formatting, and SVG emoticon rendering
 - `public/js/app/feed.js`: public and private feed rendering, filtering, and summary presentation
@@ -94,6 +95,7 @@ Browser code:
 - `public/js/app/auth.js`: login, registration, forgot-password, and reset-password controller
 - `public/js/app/post-detail.js`: public/private-link detail dialog, browser history, and Web Share integration
 - `public/js/app/format.js`: escaping, dates, and data URL sizing
+- `public/js/app/image-viewer.js`: full-size entry-photo dialog controller
 - `public/js/app/kids.js`: child-list rendering and child create/delete actions
 - `public/js/app/profile.js`: profile modal, avatars, passwords, exports, and family invitations
 - `public/js/i18n.js`: locale loading and DOM translation
@@ -187,6 +189,8 @@ Important columns:
 
 The browser derives `age_note` from the entry date and every selected saved child that has a birth date. A single child keeps the compact age value. Multiple children use semicolon-separated name-to-age pairs so the stored snapshot and all feed/export views remain unambiguous. A manually edited age note is preserved.
 
+When editing, the child picker compares the existing age note with its current calculated value. A matching value is treated as automatically generated and recalculated after an event-date change; a nonmatching value remains a manual override. Entry photos render as accessible buttons that open the image-viewer dialog. The same button markup is used in client-rendered feed/detail cards and server-rendered direct post pages.
+
 API objects expose derived `content` by joining non-empty `quote` and `story` values with one blank line. Current clients store the combined editor content in `story`; the old columns remain readable so earlier records are not lost.
 
 Entry photos use allowlisted raster data URLs and decode to no more than 512 KiB. Images and avatars are stored inside SQLite, so they contribute directly to database and backup size.
@@ -257,7 +261,7 @@ Authenticated state contains `app`, `viewer`, `profile`, `attention`, `summary`,
 
 Current entry input uses `childNames` and `content`. Legacy `childName`, `quote`, and `story` input remains accepted. Every entry requires at least one child name and either non-empty text or a valid photo. A missing title is accepted for photo entries and normalized to `Снимка`. Child names are deduplicated case-insensitively and a request may contain up to 20 names. Empty category and mood use `said` and `golden`; non-empty values must be in the fixed lists from `public/js/app/constants.js`.
 
-New entries without `happenedOn` receive the server's current local date. Native browser date controls use ISO `YYYY-MM-DD` values for the API and storage. Rendered entry dates, direct pages, exports, and admin timestamps display dates as `dd/mm/yyyy`. Updates do not add a date to an intentionally undated old entry.
+New entries without `happenedOn` receive the server's current local date. The custom Bulgarian date controls display and accept `dd/mm/yyyy`, provide a themed Monday-first calendar, and convert valid values to ISO `YYYY-MM-DD` for the API and storage. Direct pages, exports, and admin timestamps also display dates as `dd/mm/yyyy`. Updates do not add a date to an intentionally undated old entry.
 
 Private and public feed queries sort by immutable `created_at DESC, id DESC`. `happened_on` is event metadata only and does not affect feed position. Updating an entry changes `updated_at` but does not move it to the top of the feed.
 

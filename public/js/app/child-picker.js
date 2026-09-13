@@ -62,20 +62,27 @@ export function createChildPicker({ container, customInput, ageNoteInput, agePre
     showAgePreview('');
   }
 
-  function applyAge({ force = false } = {}) {
+  function suggestedAgeNote() {
     const selectedKids = selectedKnownKids();
     const selectedCount = selectedKids.length + customNames().length;
     const ages = selectedKids
       .map(kid => ({ kid, age: calculateAgeAtDate(kid.dob, parseDateInput(happenedOnInput.value)) }))
       .filter(item => item.age);
-    if (!ages.length) {
+    if (!ages.length) return { ageNote: '', ages: [] };
+    return {
+      ageNote: selectedCount > 1
+      ? ages.map(({ kid, age }) => `${kid.name}: ${age}`).join('; ')
+      : ages[0].age,
+      ages,
+    };
+  }
+
+  function applyAge({ force = false } = {}) {
+    const { ageNote, ages } = suggestedAgeNote();
+    if (!ageNote) {
       clearAutoAgeNote();
       return;
     }
-
-    const ageNote = selectedCount > 1
-      ? ages.map(({ kid, age }) => `${kid.name}: ${age}`).join('; ')
-      : ages[0].age;
     showAgePreview(ageNote);
     if (force || !ageNoteInput.value.trim() || ageNoteInput.dataset.autoAge === 'true') {
       ageNoteInput.value = ageNote;
@@ -118,7 +125,14 @@ export function createChildPicker({ container, customInput, ageNoteInput, agePre
     delete ageNoteInput.dataset.autoAge;
     delete ageNoteInput.dataset.autoKidIds;
     showAgePreview('');
-    if (!ageNoteInput.value) applyAge();
+    const { ageNote, ages } = suggestedAgeNote();
+    if (!ageNoteInput.value) {
+      applyAge();
+    } else if (ageNoteInput.value === ageNote) {
+      ageNoteInput.dataset.autoAge = 'true';
+      ageNoteInput.dataset.autoKidIds = ages.map(({ kid }) => kid.id).join(',');
+      showAgePreview(ageNote);
+    }
   }
 
   function reset() {

@@ -25,6 +25,7 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
   }
 
   function entryCard(entry, editable) {
+    const photoAlt = t('entry_photo_alt', { title: entry.title });
     const title = entry.isPublic
       ? `<a class="list-item-title public-entry-link" data-open-post-id="${entry.id}" href="/posts/${entry.id}">${renderInlineContent(entry.title)}</a>`
       : `<div class="list-item-title">${renderInlineContent(entry.title)}</div>`;
@@ -34,7 +35,7 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
         ${entry.category ? `<span class="badge ${escapeHtml(categoryClass(entry.category))}">${escapeHtml(categoryLabel(entry.category))}</span>` : ''}
       </div>
       ${entry.content ? `<div class="entry-content">${renderInlineContent(entry.content)}</div>` : ''}
-      ${entry.photo ? `<img class="entry-photo" src="${escapeHtml(entry.photo)}" alt="${escapeHtml(t('entry_photo_alt', { title: entry.title }))}">` : ''}
+      ${entry.photo ? `<button class="entry-photo-button" type="button" data-view-photo aria-label="${escapeHtml(t('entry_photo_open'))}"><img class="entry-photo" src="${escapeHtml(entry.photo)}" alt="${escapeHtml(photoAlt)}"></button>` : ''}
       ${editable ? `<div class="entry-meta">
         ${entry.isFavorite ? `<span class="tag-chip favorite-chip">${escapeHtml(t('tag_favorite'))}</span>` : ''}
         ${(entry.tags || []).map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join('')}

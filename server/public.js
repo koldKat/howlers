@@ -42,7 +42,7 @@ function renderServerEntry(entry) {
   return `<article class="list-item post-detail-entry">
     <div class="list-item-head"><div><h1 class="list-item-title">${renderInlineContent(entry.title)}</h1><div class="meta-line">${meta}</div></div></div>
     ${entry.content ? `<div class="entry-content">${renderInlineContent(entry.content)}</div>` : ''}
-    ${entry.photo ? `<img class="entry-photo" src="${escHtml(entry.photo)}" alt="${escHtml(`Снимка към ${title}`)}">` : ''}
+    ${entry.photo ? `<button class="entry-photo-button" type="button" data-view-photo aria-label="Отвори снимката в пълен размер"><img class="entry-photo" src="${escHtml(entry.photo)}" alt="${escHtml(`Снимка към ${title}`)}"></button>` : ''}
   </article>`;
 }
 

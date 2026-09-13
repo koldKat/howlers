@@ -7,7 +7,7 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const Database = require('better-sqlite3');
-const { buildMultiChildAgeNote } = require('../server/entry-ages');
+const { buildMultiChildAgeNote, calculateAgeAtDate } = require('../server/entry-ages');
 const { formatBulgarianDate } = require('../server/date-validation');
 const domain = require('../shared/domain');
 
@@ -100,6 +100,7 @@ function localDateString(date = new Date()) {
 
 async function main() {
   assert.equal(formatBulgarianDate('2026-09-02'), '02/09/2026');
+  assert.equal(formatBulgarianDate('2026-05-09'), '09/05/2026');
   assert.equal(formatBulgarianDate('invalid'), 'invalid');
   assert.equal(domain.brand.name, 'Семейни бисери');
   assert.ok(domain.categories.includes('said'));
@@ -109,6 +110,7 @@ async function main() {
     [{ name: 'Mila', dob: '2022-01-15' }, { name: 'Niki', dob: '2021-05-04' }],
     '2026-06-01'
   ), 'Mila: 4 г. 4 мес.; Niki: 5 г.');
+  assert.equal(calculateAgeAtDate('2019-01-12', '2026-05-09'), '7 г. 3 мес.');
   await waitForServer();
 
   let result = await request('/', { raw: true });
@@ -117,8 +119,10 @@ async function main() {
   assert.match(result.body, /<meta name="description" content="Детски бисери, смешни детски реплики/);
   assert.match(result.body, /"@type":"WebSite"/);
   assert.match(result.body, /<script src="\/js\/domain\.js"><\/script>/);
-  assert.match(result.body, /<input type="date" id="happened-on" lang="bg"/);
-  assert.match(result.body, /<input type="date" id="kid-dob-input" lang="bg"/);
+  assert.match(result.body, /id="happened-on" data-date-picker[^>]*placeholder="дд\/мм\/гггг"/);
+  assert.match(result.body, /id="kid-dob-input" data-date-picker[^>]*placeholder="дд\/мм\/гггг"/);
+  assert.match(result.body, /id="date-picker-dialog"/);
+  assert.match(result.body, /id="image-viewer-dialog"/);
   assert.match(result.body, /<nav class="site-nav">[\s\S]*id="mobile-family-settings"[\s\S]*<\/nav>/);
   assert.match(result.body, /class="mobile-family-settings-icon"/);
   assert.match(result.body, /id="mobile-family-settings-close"/);
@@ -806,6 +810,8 @@ async function main() {
   assert.match(result.body, /data-server-rendered="true"/);
   assert.match(result.body, /id="website-schema" type="application\/ld\+json"/);
   assert.match(result.body, /id="post-detail-schema" type="application\/ld\+json"/);
+  assert.match(result.body, /data-view-photo/);
+  assert.match(result.body, /id="image-viewer-dialog"/);
   assert.match(result.body, /class="meta-line">[^<]*\d{2}\/\d{2}\/\d{4}/);
   assert.match(result.body, /<button id="post-detail-share"/);
   assert.doesNotMatch(result.body, /<button hidden id="post-detail-share"/);

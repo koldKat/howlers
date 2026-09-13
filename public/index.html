@@ -135,7 +135,12 @@
         <form class="kid-add-form" id="kid-add-form" autocomplete="off">
           <input type="text" id="kid-name-input" maxlength="60"
             data-i18n-placeholder="kids_add_placeholder_name" placeholder="Име или прякор">
-          <input type="date" id="kid-dob-input" lang="bg" aria-label="Дата на раждане">
+          <span class="date-input-control">
+            <input type="text" id="kid-dob-input" data-date-picker inputmode="numeric" maxlength="10" autocomplete="off" placeholder="дд/мм/гггг" aria-label="Дата на раждане във формат дд/мм/гггг">
+            <button class="date-picker-trigger" type="button" aria-label="Отвори календара" data-date-picker-trigger>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+            </button>
+          </span>
           <button type="submit" class="primary-btn small-btn" data-i18n="kids_add_btn">Добави</button>
         </form>
         <div id="kid-add-error" class="inline-error"></div>
@@ -217,6 +222,27 @@
     <div class="post-detail-footer">
       <span id="post-detail-share-status" class="post-detail-share-status" role="status" aria-live="polite"></span>
       <button id="post-detail-share" class="primary-btn small-btn" type="button" data-i18n="post_share_btn">Сподели</button>
+    </div>
+  </dialog>
+
+  <dialog id="image-viewer-dialog" class="image-viewer-dialog" aria-labelledby="image-viewer-title">
+    <span id="image-viewer-title" class="sr-only" data-i18n="image_viewer_title">Снимка</span>
+    <button id="image-viewer-close" class="modal-close-btn image-viewer-close" type="button" aria-label="Затвори снимката">&times;</button>
+    <img id="image-viewer-image" alt="">
+  </dialog>
+
+  <dialog id="date-picker-dialog" class="date-picker-dialog" aria-labelledby="date-picker-label">
+    <div class="date-picker-head">
+      <button id="date-picker-prev" class="date-picker-nav" type="button" aria-label="Предишен месец">&lsaquo;</button>
+      <strong id="date-picker-label"></strong>
+      <button id="date-picker-next" class="date-picker-nav" type="button" aria-label="Следващ месец">&rsaquo;</button>
+      <button id="date-picker-close" class="modal-close-btn" type="button" aria-label="Затвори календара">&times;</button>
+    </div>
+    <div class="date-picker-weekdays" aria-hidden="true"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Нд</span></div>
+    <div id="date-picker-grid" class="date-picker-grid"></div>
+    <div class="date-picker-actions">
+      <button id="date-picker-clear" class="ghost-btn small-btn" type="button">Изчисти</button>
+      <button id="date-picker-today" class="primary-btn small-btn" type="button">Днес</button>
     </div>
   </dialog>
 
@@ -333,7 +359,12 @@
           <div class="editor-advanced-grid">
             <label>
               <span data-i18n="form_label_date">Дата</span>
-              <input type="date" id="happened-on" lang="bg" aria-label="Дата">
+              <span class="date-input-control">
+                <input type="text" id="happened-on" data-date-picker inputmode="numeric" maxlength="10" autocomplete="off" placeholder="дд/мм/гггг" aria-label="Дата във формат дд/мм/гггг">
+                <button class="date-picker-trigger" type="button" aria-label="Отвори календара" data-date-picker-trigger>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+                </button>
+              </span>
             </label>
             <label>
               <span data-i18n="form_label_category">Категория</span>
