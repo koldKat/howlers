@@ -97,7 +97,7 @@ Browser code:
 - `public/js/app/format.js`: escaping, dates, and data URL sizing
 - `public/js/app/image-viewer.js`: full-size entry-photo dialog controller
 - `public/js/app/kids.js`: child-list rendering and child create/delete actions
-- `public/js/app/profile.js`: profile modal, avatars, passwords, exports, and family invitations
+- `public/js/app/profile.js`: profile modal, non-editable initial dialog focus, avatars, passwords, exports, and family invitations
 - `public/js/i18n.js`: locale loading and DOM translation
 - `public/locales/bg.json`: Bulgarian strings
 - `public/admin.html`, `public/js/admin.js`, `public/js/admin/*`, `public/css/admin.css`: admin panel

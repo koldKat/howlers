@@ -150,6 +150,7 @@ export function createProfileController(elements, { getViewer, setViewer, onFami
     elements.profileModal.style.display = 'flex';
     document.body.classList.add('profile-open');
     elements.profileCard.scrollTop = 0;
+    elements.profileCard.focus({ preventScroll: true });
     try {
       await loadDetails();
     } catch (error) {

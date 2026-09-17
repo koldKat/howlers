@@ -165,6 +165,14 @@ async function main() {
   assert.match(result.body, /els\.editorDialog\.scrollTop = 0/);
   assert.doesNotMatch(result.body, /latestKids/);
 
+  result = await request('/', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /id="profile-card"[^>]*tabindex="-1"/);
+
+  result = await request('/js/app/profile.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /elements\.profileCard\.focus\(\{ preventScroll: true \}\)/);
+
   result = await request('/css/style.css', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, /--editor-viewport-height/);
