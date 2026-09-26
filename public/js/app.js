@@ -182,6 +182,7 @@ function markEditorValidationError(field) {
 // ── Form ─────────────────────────────────────────────────────
 
 function entryPayload() {
+  const photos = editorTools.getPhotos();
   return {
     childNames: childPicker.selectedNames(),
     happenedOn: parseDateInput(els.happenedOn.value),
@@ -189,7 +190,8 @@ function entryPayload() {
     category: els.category.value,
     mood: els.mood.value,
     content: els.content.value.trim(),
-    photo: editorTools.getPhoto(),
+    photo: photos[0] || '',
+    photos,
     ageNote: els.ageNote.value.trim(),
     tags: els.tags.value,
     isFavorite: els.isFavorite.checked,
@@ -205,7 +207,7 @@ function resetForm() {
   els.mood.value = '';
   els.content.value = '';
   editorTools.resetTextTarget();
-  editorTools.setPhoto('');
+  editorTools.setPhotos([]);
   childPicker.reset();
   els.tags.value = '';
   els.isFavorite.checked = false;
@@ -228,7 +230,7 @@ function fillForm(entry) {
   els.mood.value = entry.mood || '';
   els.content.value = entry.content || [entry.quote, entry.story].filter(Boolean).join('\n\n');
   editorTools.resetTextTarget();
-  editorTools.setPhoto(entry.photo || '');
+  editorTools.setPhotos(entry.photos || (entry.photo ? [entry.photo] : []));
   childPicker.setAgeNote(entry.ageNote || '');
   els.tags.value = (entry.tags || []).join(', ');
   els.isFavorite.checked = Boolean(entry.isFavorite);
@@ -339,6 +341,11 @@ async function becomeGuest() {
 async function saveEntry() {
   els.formError.textContent = '';
   clearEditorValidation();
+  if (editorTools.isProcessingPhotos()) {
+    els.formError.textContent = t('post_photo_wait');
+    markEditorValidationError('photo');
+    return;
+  }
   const id = els.entryId.value;
   try {
     const result = await apiFetch(id ? `/api/howlers/${id}` : '/api/howlers', {
@@ -500,7 +507,8 @@ Object.entries(editorValidationFields).forEach(([field, controls]) => {
     });
   });
 });
-els.removePostPhotoBtn.addEventListener('click', () => {
+els.postPhotoPreview.addEventListener('click', event => {
+  if (!event.target.closest('[data-remove-photo-index]')) return;
   clearEditorValidation('photo');
   els.formError.textContent = '';
 });

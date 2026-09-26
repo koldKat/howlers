@@ -36,13 +36,22 @@ function entryDescription(entry) {
   return text.length > 155 ? `${text.slice(0, 152).trim()}...` : text;
 }
 
+function renderEntryPhotos(entry, title) {
+  const photos = Array.isArray(entry.photos) ? entry.photos : (entry.photo ? [entry.photo] : []);
+  if (!photos.length) return '';
+  return `<div class="entry-photo-gallery">${photos.map((photo, index) => {
+    const position = photos.length > 1 ? ` ${index + 1}/${photos.length}` : '';
+    return `<button class="entry-photo-button" type="button" data-view-photo aria-label="Отвори снимката в пълен размер${position}"><img class="entry-photo" src="${escHtml(photo)}" alt="${escHtml(`Снимка към ${title}`)}${position}"></button>`;
+  }).join('')}</div>`;
+}
+
 function renderServerEntry(entry) {
   const title = stripEntryMarkup(entry.title) || entry.title;
   const meta = [entry.childName, formatBulgarianDate(entry.happenedOn), entry.ageNote].filter(Boolean).map(escHtml).join(' &bull; ');
   return `<article class="list-item post-detail-entry">
     <div class="list-item-head"><div><h1 class="list-item-title">${renderInlineContent(entry.title)}</h1><div class="meta-line">${meta}</div></div></div>
     ${entry.content ? `<div class="entry-content">${renderInlineContent(entry.content)}</div>` : ''}
-    ${entry.photo ? `<button class="entry-photo-button" type="button" data-view-photo aria-label="Отвори снимката в пълен размер"><img class="entry-photo" src="${escHtml(entry.photo)}" alt="${escHtml(`Снимка към ${title}`)}"></button>` : ''}
+    ${renderEntryPhotos(entry, title)}
   </article>`;
 }
 

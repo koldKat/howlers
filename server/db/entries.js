@@ -13,9 +13,20 @@ function listFamilyKids(familyId) {
   return db.prepare('SELECT name, dob FROM kids WHERE family_id = ?').all(familyId);
 }
 
+function photosFromRow(row) {
+  try {
+    const photos = JSON.parse(row.photos_json || '[]');
+    if (Array.isArray(photos) && photos.length) return photos.filter(value => typeof value === 'string' && value);
+  } catch {
+    // Invalid or absent collection data falls back to the legacy photo column.
+  }
+  return row.photo ? [row.photo] : [];
+}
+
 function mapEntry(row, familyKids = []) {
   const content = [row.quote, row.story].map(value => String(value || '').trim()).filter(Boolean).join('\n\n');
   const childNames = childNamesFromRow(row);
+  const photos = photosFromRow(row);
   let tags = [];
   try {
     tags = normalizeTags(JSON.parse(row.tags_json || '[]'));
@@ -24,7 +35,7 @@ function mapEntry(row, familyKids = []) {
   }
   return {
     id: row.id, childName: childNames.join(', '), childNames, title: row.title,
-    quote: row.quote, story: row.story, content, photo: row.photo || '', category: row.category,
+    quote: row.quote, story: row.story, content, photo: photos[0] || '', photos, category: row.category,
     happenedOn: row.happened_on,
     ageNote: buildMultiChildAgeNote(childNames, familyKids, row.happened_on) || row.age_note,
     mood: row.mood, tags,
@@ -51,11 +62,11 @@ function getHowler(userId, howlerId) {
 function createHowler(userId, input) {
   const familyId = getFamilyIdForUser(userId);
   const result = db.prepare(`INSERT INTO howlers (
-    user_id, family_id, child_name, child_names_json, title, quote, story, photo, category,
+    user_id, family_id, child_name, child_names_json, title, quote, story, photo, photos_json, category,
     happened_on, age_note, mood, tags_json, is_favorite, is_public, updated_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`).run(
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`).run(
     userId, familyId, input.childNames[0], JSON.stringify(input.childNames), input.title,
-    input.quote, input.story, input.photo, input.category, input.happenedOn, input.ageNote,
+    input.quote, input.story, input.photo, JSON.stringify(input.photos), input.category, input.happenedOn, input.ageNote,
     input.mood, JSON.stringify(normalizeTags(input.tags)), input.isFavorite ? 1 : 0,
     input.isPublic ? 1 : 0,
   );
@@ -65,11 +76,11 @@ function createHowler(userId, input) {
 function updateHowler(userId, howlerId, input) {
   const familyId = getFamilyIdForUser(userId);
   const result = db.prepare(`UPDATE howlers SET
-    child_name = ?, child_names_json = ?, title = ?, quote = ?, story = ?, photo = ?, category = ?,
+    child_name = ?, child_names_json = ?, title = ?, quote = ?, story = ?, photo = ?, photos_json = ?, category = ?,
     happened_on = ?, age_note = ?, mood = ?, tags_json = ?, is_favorite = ?, is_public = ?,
     updated_at = strftime('%s', 'now') WHERE family_id = ? AND id = ?`).run(
     input.childNames[0], JSON.stringify(input.childNames), input.title, input.quote, input.story,
-    input.photo, input.category, input.happenedOn, input.ageNote, input.mood,
+    input.photo, JSON.stringify(input.photos), input.category, input.happenedOn, input.ageNote, input.mood,
     JSON.stringify(normalizeTags(input.tags)), input.isFavorite ? 1 : 0, input.isPublic ? 1 : 0,
     familyId, howlerId,
   );

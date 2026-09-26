@@ -16,6 +16,7 @@
     maxAvatarBytes: 300 * 1024,
     maxPostPhotoBytes: 512 * 1024,
     maxPostPhotoDimension: 1600,
+    maxPostPhotos: 6,
     maxUsernameLength: 60,
     maxDisplayNameLength: 60,
     maxChildNameLength: 60,

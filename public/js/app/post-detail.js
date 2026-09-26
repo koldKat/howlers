@@ -1,6 +1,6 @@
 import { t } from '../i18n.js';
 import { apiFetch } from './api.js';
-import { categoryClass, categoryLabel, entryMetaLine, renderInlineContent } from './entry-presentation.js';
+import { categoryClass, categoryLabel, entryMetaLine, renderEntryPhotos, renderInlineContent } from './entry-presentation.js';
 import { escapeHtml } from './format.js';
 import { APP_NAME, EMOTICON_TOKEN_RE, ROOT_DESCRIPTION, ROOT_OG_DESCRIPTION, ROOT_TITLE } from './constants.js';
 
@@ -14,14 +14,13 @@ function plainTitle(value) {
 }
 
 function renderEntry(entry) {
-  const photoAlt = t('entry_photo_alt', { title: entry.title });
   return `<article class="list-item post-detail-entry">
     <div class="list-item-head"><div>
       <h1 class="list-item-title">${renderInlineContent(entry.title)}</h1>
       <div class="meta-line">${entryMetaLine(entry)}</div>
     </div>${entry.category ? `<span class="badge ${escapeHtml(categoryClass(entry.category))}">${escapeHtml(categoryLabel(entry.category))}</span>` : ''}</div>
     ${entry.content ? `<div class="entry-content">${renderInlineContent(entry.content)}</div>` : ''}
-    ${entry.photo ? `<button class="entry-photo-button" type="button" data-view-photo aria-label="${escapeHtml(t('entry_photo_open'))}"><img class="entry-photo" src="${escapeHtml(entry.photo)}" alt="${escapeHtml(photoAlt)}"></button>` : ''}
+    ${renderEntryPhotos(entry)}
   </article>`;
 }
 

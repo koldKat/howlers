@@ -105,6 +105,7 @@ function initializeSchema(db) {
   addColumnIfMissing(db, 'howlers', 'is_public', 'ALTER TABLE howlers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0');
   addColumnIfMissing(db, 'howlers', 'family_id', 'ALTER TABLE howlers ADD COLUMN family_id INTEGER');
   addColumnIfMissing(db, 'howlers', 'photo', "ALTER TABLE howlers ADD COLUMN photo TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(db, 'howlers', 'photos_json', "ALTER TABLE howlers ADD COLUMN photos_json TEXT NOT NULL DEFAULT '[]'");
   addColumnIfMissing(db, 'howlers', 'child_names_json', "ALTER TABLE howlers ADD COLUMN child_names_json TEXT NOT NULL DEFAULT '[]'");
   addColumnIfMissing(db, 'howlers', 'share_token', 'ALTER TABLE howlers ADD COLUMN share_token TEXT');
   addColumnIfMissing(db, 'users', 'locale', "ALTER TABLE users ADD COLUMN locale TEXT NOT NULL DEFAULT 'bg'");

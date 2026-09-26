@@ -10,9 +10,10 @@ const BACKUP_DIR = path.join(APP_ROOT, 'backups');
 const BACKUP_INTERVAL_MS = 60 * 60 * 1000;
 const BACKUP_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
 const BACKUPS_DISABLED = process.env.DISABLE_BACKUPS === '1';
-const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
+const MAX_REQUEST_BYTES = 5 * 1024 * 1024;
 const MAX_AVATAR_BYTES = domain.limits.maxAvatarBytes;
 const MAX_POST_PHOTO_BYTES = domain.limits.maxPostPhotoBytes;
+const MAX_POST_PHOTOS = domain.limits.maxPostPhotos;
 const PROTECTED_ADMIN_USERS = new Set(['slanchoff', 'koldkat']);
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://biseri.net').replace(/\/$/, '');
 const AUTH_FAILURE_WINDOW_MS = 15 * 60 * 1000;
@@ -43,6 +44,7 @@ module.exports = {
   MAX_REQUEST_BYTES,
   MAX_AVATAR_BYTES,
   MAX_POST_PHOTO_BYTES,
+  MAX_POST_PHOTOS,
   PROTECTED_ADMIN_USERS,
   PUBLIC_URL,
   AUTH_FAILURE_WINDOW_MS,

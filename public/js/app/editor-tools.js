@@ -5,6 +5,7 @@ import {
   EMOTICON_SLUGS,
   MAX_POST_PHOTO_BYTES,
   MAX_POST_PHOTO_DIMENSION,
+  MAX_POST_PHOTOS,
   MOOD_SLUGS,
   TEXT_FORMATS,
 } from './constants.js';
@@ -12,7 +13,9 @@ import { categoryLabel, emoticonLabel, moodLabel } from './entry-presentation.js
 import { dataUrlBytes, escapeHtml } from './format.js';
 
 export function createEditorTools(elements) {
-  let postPhotoData = '';
+  let postPhotos = [];
+  let photoWorkId = 0;
+  let processingPhotos = false;
   let activeTextFormatFieldId = 'content';
   const textFormatSelections = new Map();
 
@@ -96,14 +99,36 @@ export function createEditorTools(elements) {
     target.focus();
   }
 
-  function setPhoto(photo) {
-    postPhotoData = photo || '';
-    elements.postPhotoPreview.src = postPhotoData;
-    elements.postPhotoPreview.hidden = !postPhotoData;
-    elements.removePostPhotoBtn.hidden = !postPhotoData;
-    elements.postPhotoStatus.textContent = postPhotoData
-      ? t('post_photo_ready', { size: Math.ceil(dataUrlBytes(postPhotoData) / 1024) })
+  function setPhotoProcessing(processing) {
+    processingPhotos = processing;
+    elements.postPhotoInput.disabled = processing;
+    elements.saveBtn.disabled = processing;
+    elements.postPhotoField.classList.toggle('photo-processing', processing);
+    elements.postPhotoField.toggleAttribute('aria-busy', processing);
+    elements.postPhotoPreview.querySelectorAll('[data-remove-photo-index]').forEach(button => {
+      button.disabled = processing;
+    });
+  }
+
+  function renderPhotos(photos) {
+    postPhotos = (Array.isArray(photos) ? photos : [photos]).filter(Boolean).slice(0, MAX_POST_PHOTOS);
+    elements.postPhotoPreview.innerHTML = postPhotos.map((photo, index) => `
+      <div class="post-photo-preview-item">
+        <img src="${escapeHtml(photo)}" alt="${escapeHtml(t('post_photo_preview_alt', { number: index + 1 }))}">
+        <button class="post-photo-remove" type="button" data-remove-photo-index="${index}" aria-label="${escapeHtml(t('post_photo_remove_number', { number: index + 1 }))}" data-tooltip="${escapeHtml(t('post_photo_remove'))}">&times;</button>
+      </div>
+    `).join('');
+    elements.postPhotoPreview.hidden = postPhotos.length === 0;
+    const totalSize = postPhotos.reduce((sum, photo) => sum + dataUrlBytes(photo), 0);
+    elements.postPhotoStatus.textContent = postPhotos.length
+      ? t('post_photos_ready', { count: postPhotos.length, size: Math.ceil(totalSize / 1024) })
       : t('post_photo_hint');
+  }
+
+  function setPhotos(photos) {
+    photoWorkId += 1;
+    setPhotoProcessing(false);
+    renderPhotos(photos);
   }
 
   function loadImageFile(file) {
@@ -178,17 +203,33 @@ export function createEditorTools(elements) {
   }
 
   elements.postPhotoInput.addEventListener('change', async event => {
-    const file = event.target.files[0];
+    const files = [...event.target.files];
     event.target.value = '';
-    if (!file) return;
+    if (!files.length) return;
+    if (postPhotos.length + files.length > MAX_POST_PHOTOS) {
+      elements.postPhotoStatus.textContent = t('post_photo_error_count', { count: MAX_POST_PHOTOS });
+      return;
+    }
+    const workId = ++photoWorkId;
+    const existingPhotos = [...postPhotos];
+    setPhotoProcessing(true);
     elements.postPhotoStatus.textContent = t('post_photo_processing');
     try {
-      setPhoto(await resizePhoto(file));
+      const resized = [];
+      for (const file of files) resized.push(await resizePhoto(file));
+      if (workId === photoWorkId) renderPhotos([...existingPhotos, ...resized]);
     } catch (error) {
-      elements.postPhotoStatus.textContent = error.message;
+      if (workId === photoWorkId) elements.postPhotoStatus.textContent = error.message;
+    } finally {
+      if (workId === photoWorkId) setPhotoProcessing(false);
     }
   });
-  elements.removePostPhotoBtn.addEventListener('click', () => setPhoto(''));
+  elements.postPhotoPreview.addEventListener('click', event => {
+    const button = event.target.closest('[data-remove-photo-index]');
+    if (!button) return;
+    const index = Number(button.dataset.removePhotoIndex);
+    setPhotos(postPhotos.filter((_photo, photoIndex) => photoIndex !== index));
+  });
   document.querySelectorAll('.text-format-toolbar').forEach(toolbar => {
     toolbar.addEventListener('pointerdown', event => {
       if (event.target.closest('[data-text-format]')) event.preventDefault();
@@ -219,9 +260,10 @@ export function createEditorTools(elements) {
   });
 
   return {
-    getPhoto: () => postPhotoData,
+    getPhotos: () => [...postPhotos],
+    isProcessingPhotos: () => processingPhotos,
     initializeControls,
     resetTextTarget,
-    setPhoto,
+    setPhotos,
   };
 }

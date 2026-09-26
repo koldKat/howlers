@@ -126,7 +126,7 @@ npm start</code></pre>
 <li><code>docs/*.html</code>: generated standalone equivalents</li>
 </ul>
 <h2>Request flow</h2>
-<p><code>server.js</code> constructs the application dependencies and starts the listener. <code>server/app.js</code> parses the URL, dispatches explicit API and SEO routes to feature handlers, and falls back to static GET handling. Its awaited dispatch is the shared error boundary for synchronous and asynchronous route failures. JSON request bodies are limited to 2 MiB and must contain an object. Oversized requests, malformed JSON, non-object JSON, and malformed encoded paths return <code>400</code> or <code>413</code> as appropriate.</p>
+<p><code>server.js</code> constructs the application dependencies and starts the listener. <code>server/app.js</code> parses the URL, dispatches explicit API and SEO routes to feature handlers, and falls back to static GET handling. Its awaited dispatch is the shared error boundary for synchronous and asynchronous route failures. JSON request bodies are limited to 5 MiB to accommodate six compressed photos and must contain an object. Oversized requests, malformed JSON, non-object JSON, and malformed encoded paths return <code>400</code> or <code>413</code> as appropriate. A reverse proxy should allow at least 6 MiB request bodies so it does not reject a valid application payload first.</p>
 <p>API responses use JSON unless the route explicitly returns HTML, XML, plain text, an export, or an SSE stream. Unmatched non-GET routes return <code>404</code>.</p>
 <p>New usernames are trimmed and limited to 60 characters. Registration and password changes require passwords from 6 through 256 characters. Login remains compatible with existing credentials created before these limits were enforced.</p>
 <p>Static serving resolves paths below <code>public/</code> and rejects traversal outside that root.</p>
@@ -168,16 +168,18 @@ npm start</code></pre>
 <li>owner <code>user_id</code> and shared <code>family_id</code></li>
 <li>legacy first-child <code>child_name</code>, full <code>child_names_json</code>, <code>title</code>, <code>happened_on</code>, and <code>age_note</code></li>
 <li>legacy <code>quote</code> plus current <code>story</code></li>
-<li><code>photo</code>, <code>category</code>, <code>mood</code>, and <code>tags_json</code></li>
+<li>legacy first-image <code>photo</code>, ordered <code>photos_json</code>, <code>category</code>, <code>mood</code>, and <code>tags_json</code></li>
 <li><code>is_favorite</code> and <code>is_public</code></li>
 <li>optional unique <code>share_token</code> for private link sharing</li>
 <li><code>created_at</code> and <code>updated_at</code></li>
 </ul>
 <p><code>child_names_json</code> stores the complete ordered child-name list. <code>child_name</code> remains populated with the first name for backward storage compatibility. Startup migration backfills existing rows as one-item lists. API objects expose <code>childNames</code> plus a compatibility <code>childName</code> label that joins all names with commas. Create and update requests accept <code>childNames</code>; requests using the former singular <code>childName</code> remain valid.</p>
 <p>The browser derives <code>age_note</code> from the entry date and every selected saved child that has a birth date. A single child keeps the compact age value. Multiple children use semicolon-separated name-to-age pairs so the stored snapshot and all feed/export views remain unambiguous. A manually edited age note is preserved.</p>
-<p>When editing, the child picker compares the existing age note with its current calculated value. A matching value is treated as automatically generated and recalculated after an event-date change; a nonmatching value remains a manual override. Entry photos render as accessible buttons that open the image-viewer dialog. The same button markup is used in client-rendered feed/detail cards and server-rendered direct post pages.</p>
+<p>When editing, the child picker compares the existing age note with its current calculated value. A matching value is treated as automatically generated and recalculated after an event-date change; a nonmatching value remains a manual override. Entry photos render as an ordered single-column gallery of accessible buttons that open the selected image in the image-viewer dialog. Editor previews use the same vertical order without cropping. The same entry-photo button markup is used in client-rendered feed/detail cards and server-rendered direct post pages.</p>
 <p>API objects expose derived <code>content</code> by joining non-empty <code>quote</code> and <code>story</code> values with one blank line. Current clients store the combined editor content in <code>story</code>; the old columns remain readable so earlier records are not lost.</p>
-<p>Entry photos use allowlisted raster data URLs and decode to no more than 512 KiB. Images and avatars are stored inside SQLite, so they contribute directly to database and backup size.</p>
+<p><code>photos_json</code> stores up to six ordered data URLs. <code>photo</code> retains the first item for backward compatibility. Rows created before the collection column was introduced fall back to <code>photo</code> automatically, so existing images are not lost. Current API objects expose both <code>photos</code> and the compatibility <code>photo</code> value.</p>
+<p>Entry photos use allowlisted raster data URLs and each decodes to no more than 512 KiB. Images and avatars are stored inside SQLite, so they contribute directly to database and backup size.</p>
+<p>The editor processes selected photos sequentially and uses an operation generation to discard stale asynchronous results after a reset or replacement. While processing is active, further photo selection, removal, and saving are disabled. <code>saveEntry()</code> also checks the processing state defensively before constructing the request.</p>
 <h2>Authentication and authorization</h2>
 <p>Passwords are hashed with <code>crypto.scrypt</code> and a random per-user salt. Session tokens are 32 random bytes encoded as hexadecimal.</p>
 <p>Five consecutive incorrect passwords temporarily lock a normal account for 15 minutes. Successful authentication or admin unlock clears the account counter. A process-local IP throttle blocks subsequent login or registration requests after eight failures within 15 minutes and is cleared by successful authentication. Forwarded addresses are trusted only when the immediate peer is localhost; when local Nginx appends a chain, the throttle uses its last address rather than a client-controlled first value. Expired per-address buckets are purged every 15 minutes. <code>slanchoff</code> and <code>koldkat</code> bypass automatic and manual lock logic.</p>
@@ -233,7 +235,7 @@ npm start</code></pre>
 <li><code>POST /api/kids</code>: creates a child and returns <code>{ ok, kid }</code></li>
 <li><code>DELETE /api/kids/:id</code>: removes a child from the shared list</li>
 </ul>
-<p>Current entry input uses <code>childNames</code> and <code>content</code>. Legacy <code>childName</code>, <code>quote</code>, and <code>story</code> input remains accepted. Every entry requires at least one child name and either non-empty text or a valid photo. A missing title is accepted for photo entries and normalized to <code>Снимка</code>. Child names are deduplicated case-insensitively and a request may contain up to 20 names. Empty category and mood use <code>said</code> and <code>golden</code>; non-empty values must be in the fixed lists from <code>public/js/app/constants.js</code>.</p>
+<p>Current entry input uses <code>childNames</code>, <code>content</code>, and <code>photos</code>. Legacy <code>childName</code>, <code>quote</code>, <code>story</code>, and singular <code>photo</code> input remains accepted. Every entry requires at least one child name and either non-empty text or at least one valid photo. A missing title is accepted for photo entries and normalized to <code>Снимка</code>. Child names are deduplicated case-insensitively and a request may contain up to 20 names. Empty category and mood use <code>said</code> and <code>golden</code>; non-empty values must be in the fixed lists from <code>public/js/app/constants.js</code>.</p>
 <p>New entries without <code>happenedOn</code> receive the server's current local date. The custom Bulgarian date controls display and accept <code>dd/mm/yyyy</code>, provide a themed Monday-first calendar, and convert valid values to ISO <code>YYYY-MM-DD</code> for the API and storage. Direct pages, exports, and admin timestamps also display dates as <code>dd/mm/yyyy</code>. Updates do not add a date to an intentionally undated old entry.</p>
 <p>Private and public feed queries sort by immutable <code>created_at DESC, id DESC</code>. <code>happened_on</code> is event metadata only and does not affect feed position. Updating an entry changes <code>updated_at</code> but does not move it to the top of the feed.</p>
 <h3>Family invites</h3>
@@ -248,6 +250,7 @@ npm start</code></pre>
 <li><code>GET /api/export?format=pdf</code>: returns print-oriented HTML and opens the browser print dialog</li>
 </ul>
 <p>The PDF route does not generate a PDF file on the server. The user selects PDF in the browser print dialog.</p>
+<p>TXT export records the number of attached photos but cannot contain image files. Print/PDF embeds every attached photo and permits a multi-photo card to continue across pages while keeping each image intact. Neither format is a machine-restorable archive of the stored image data.</p>
 <h3>Admin</h3>
 <p>All admin routes require a direct localhost request. Requests with forwarding headers receive <code>403</code>, even when the reverse proxy connects from localhost:</p>
 <ul>
@@ -276,10 +279,11 @@ npm start</code></pre>
 <li>legacy quote up to 800 and story up to 4,000 characters</li>
 <li>a real calendar date in <code>YYYY-MM-DD</code> form when present</li>
 <li>fixed category and mood values</li>
-<li>raster image MIME, decoded size, and matching file signature</li>
+<li>zero through six ordered photos</li>
+<li>raster image MIME, decoded size of at most 512 KiB per photo, and matching file signature</li>
 </ul>
 <p>Entry validation errors include both <code>error</code> and a stable <code>field</code> name. The editor keeps the message in its bottom alert and applies <code>aria-invalid</code>, <code>aria-describedby</code>, and the red <code>editor-field-invalid</code> style to the matching control. Editing that control clears its visual error state and the stale message.</p>
-<p>An entry must contain text or a photo. A valid photo-only entry may use any valid past date and does not require filler text.</p>
+<p>An entry must contain text or at least one photo. A valid photo-only entry may use any valid past date and does not require filler text.</p>
 <p>Tags are normalized by trimming, removing empty values and duplicates, and keeping at most eight.</p>
 <h2>Live update model</h2>
 <p>The browser hydrates over HTTP and then opens <code>/api/events</code>.</p>
@@ -337,7 +341,7 @@ npm run docs:build
 npm run docs:html-check
 npm run docs:check
 npm run hooks:install</code></pre>
-<p><code>npm test</code> starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, duplicate emails, automatic and manual account locks, forwarded-address throttling, reset-request limits, protected accounts, password reset consumption, write-only SMTP settings, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, photos, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and direct-only admin routes.</p>
+<p><code>npm test</code> starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, duplicate emails, automatic and manual account locks, forwarded-address throttling, reset-request limits, protected accounts, password reset consumption, write-only SMTP settings, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, single and multiple photos, legacy-photo migration fallback, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and direct-only admin routes.</p>
 <p><code>docs/*.md</code> files are the source of truth. <code>npm run docs:build</code> regenerates standalone HTML equivalents, while <code>npm run docs:html-check</code> fails if generated HTML is stale.</p>
 <p><code>npm run docs:check</code> examines staged application changes, including deletions, requires a staged Markdown documentation update when behavior, API, storage, setup, or maintainability changed, and verifies that all generated HTML files match their Markdown sources. A Git inspection error fails the check. <code>DOCS_GUARD_BYPASS=1</code> skips only the relevance check and still checks HTML synchronization.</p>
   </main>

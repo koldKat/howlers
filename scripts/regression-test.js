@@ -123,6 +123,8 @@ async function main() {
   assert.match(result.body, /id="kid-dob-input" data-date-picker[^>]*placeholder="дд\/мм\/гггг"/);
   assert.match(result.body, /id="date-picker-dialog"/);
   assert.match(result.body, /id="image-viewer-dialog"/);
+  assert.match(result.body, /id="post-photo-input"[^>]*multiple/);
+  assert.match(result.body, /id="post-photo-preview" class="post-photo-preview-grid"/);
   assert.match(result.body, /<nav class="site-nav">[\s\S]*id="mobile-family-settings"[\s\S]*<\/nav>/);
   assert.match(result.body, /class="mobile-family-settings-icon"/);
   assert.match(result.body, /id="mobile-family-settings-close"/);
@@ -173,6 +175,13 @@ async function main() {
   assert.equal(result.status, 200);
   assert.match(result.body, /elements\.profileCard\.focus\(\{ preventScroll: true \}\)/);
 
+  result = await request('/js/app/editor-tools.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /getPhotos:\s*\(\) => \[\.\.\.postPhotos\]/);
+  assert.match(result.body, /isProcessingPhotos:\s*\(\) => processingPhotos/);
+  assert.match(result.body, /workId === photoWorkId/);
+  assert.match(result.body, /data-remove-photo-index/);
+
   result = await request('/css/style.css', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, /--editor-viewport-height/);
@@ -187,6 +196,8 @@ async function main() {
   assert.match(result.body, /\.post-detail-footer:has\(#post-detail-share\[hidden\]\):has\(\.post-detail-share-status:empty\)/);
   assert.doesNotMatch(result.body, /\.post-detail-dialog\s*\{\s*width:\s*100vw;\s*height:\s*100dvh;/);
   assert.match(result.body, /\.entry-content\s*\{[\s\S]*text-align: justify/);
+  assert.match(result.body, /\.entry-photo-gallery\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(result.body, /\.post-photo-preview-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
   assert.match(result.body, /input\.editor-field-invalid[\s\S]*border-color:\s*#cf3f5b/);
   assert.match(result.body, /#mobile-family-settings,\s*\.mobile-sidebar-head\s*\{ display: none; \}/);
   assert.match(result.body, /@media \(max-width: 860px\)[\s\S]*#mobile-family-settings\s*\{ display: inline-flex; \}/);
@@ -418,7 +429,7 @@ async function main() {
   result = await request('/api/profile', {
     token: alpha,
     method: 'PATCH',
-    body: { displayName: 'x'.repeat(2 * 1024 * 1024) },
+    body: { displayName: 'x'.repeat(5 * 1024 * 1024) },
   });
   assert.equal(result.status, 413);
   assert.equal(result.body.error, 'Заявката е прекалено голяма.');
@@ -516,7 +527,7 @@ async function main() {
       title: '',
       quote: '',
       story: '',
-      photo: TINY_PNG,
+      photos: [TINY_PNG, TINY_PNG],
       happenedOn: '2018-03-14',
       isPublic: true,
     }),
@@ -526,6 +537,7 @@ async function main() {
   assert.equal(result.body.entry.title, 'Снимка');
   assert.equal(result.body.entry.content, '');
   assert.equal(result.body.entry.photo, TINY_PNG);
+  assert.deepEqual(result.body.entry.photos, [TINY_PNG, TINY_PNG]);
   assert.equal(result.body.entry.happenedOn, '2018-03-14');
   assert.equal(result.body.state.entries[0].id, backdatedPhotoId);
   result = await request('/api/feed');
@@ -564,6 +576,12 @@ async function main() {
   assert.equal(result.body.state.entries.some(entry => entry.id === result.body.entry.id), true);
   const alphaEntryId = result.body.entry.id;
 
+  const legacyPhotoDb = new Database(databasePath);
+  legacyPhotoDb.prepare("UPDATE howlers SET photos_json = '[]' WHERE id = ?").run(alphaEntryId);
+  legacyPhotoDb.close();
+  result = await request('/api/state', { token: alpha });
+  assert.deepEqual(result.body.entries.find(entry => entry.id === alphaEntryId).photos, [TINY_PNG]);
+
   result = await request('/api/howlers', {
     token: alpha,
     method: 'POST',
@@ -590,6 +608,15 @@ async function main() {
     body: entryBody({ title: 'Oversized photo', photo: oversizedPhoto }),
   });
   assert.equal(result.status, 400);
+
+  result = await request('/api/howlers', {
+    token: alpha,
+    method: 'POST',
+    body: entryBody({ photos: Array(domain.limits.maxPostPhotos + 1).fill(TINY_PNG) }),
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, `Можеш да добавиш най-много ${domain.limits.maxPostPhotos} снимки.`);
+  assert.equal(result.body.field, 'photo');
 
   result = await request('/api/kids', {
     token: beta,
@@ -725,7 +752,7 @@ async function main() {
       quote: undefined,
       story: undefined,
       content: 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]',
-      photo: TINY_PNG,
+      photos: [TINY_PNG, TINY_PNG],
       category: 'mixed',
       mood: 'hilarious',
       tags: ['shared'],
@@ -743,6 +770,7 @@ async function main() {
   assert.equal(result.body.entry.content, 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]');
   assert.equal(result.body.entry.photo, TINY_PNG);
   assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photo, TINY_PNG);
+  assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photos.length, 2);
   assert.deepEqual(result.body.state.entries.find(entry => entry.id === alphaEntryId).childNames, ['Mila', 'Niki']);
   assert.deepEqual(result.body.state.summary.kidsBreakdown, [
     { childName: 'Niki', total: 2 },
@@ -754,6 +782,7 @@ async function main() {
   assert.equal(result.body.find(entry => entry.id === alphaEntryId).title, 'Edited [b]:laugh: by beta[/b]');
   assert.match(result.body.find(entry => entry.id === alphaEntryId).content, /Shared \[u\]:surprised:/);
   assert.equal(result.body.find(entry => entry.id === alphaEntryId).photo, TINY_PNG);
+  assert.equal(result.body.find(entry => entry.id === alphaEntryId).photos.length, 2);
   assert.deepEqual(result.body.find(entry => entry.id === alphaEntryId).childNames, ['Mila', 'Niki']);
   assert.deepEqual(result.body.find(entry => entry.id === alphaEntryId).tags, []);
   assert.equal(result.body.some(entry => entry.id === betaEntryId), false);
@@ -819,6 +848,7 @@ async function main() {
   assert.match(result.body, /id="website-schema" type="application\/ld\+json"/);
   assert.match(result.body, /id="post-detail-schema" type="application\/ld\+json"/);
   assert.match(result.body, /data-view-photo/);
+  assert.equal((result.body.match(/data-view-photo/g) || []).length, 2);
   assert.match(result.body, /id="image-viewer-dialog"/);
   assert.match(result.body, /class="meta-line">[^<]*\d{2}\/\d{2}\/\d{4}/);
   assert.match(result.body, /<button id="post-detail-share"/);
@@ -927,7 +957,7 @@ async function main() {
   assert.match(result.body, /Възраст:\s+Mila: 4 г\. 4 мес\.; Niki: 5 г\./);
   assert.match(result.body, /Shared \[u\]:surprised:\[\/u\]/);
   assert.match(result.body, /A \[i\]silly ending :silly:\[\/i\] then \[s\]angry :angry:\[\/s\]/);
-  assert.match(result.body, /\[Има прикачена снимка\]/);
+  assert.match(result.body, /\[Прикачени снимки: 2\]/);
 
   result = await request('/api/export?format=pdf', { token: beta, raw: true });
   assert.match(result.body, /<use href="\/emoticons\.svg#laugh"><\/use>/);
@@ -937,6 +967,9 @@ async function main() {
   assert.match(result.body, /<em>silly ending <svg class="inline-emoticon"/);
   assert.match(result.body, /<s>angry <svg class="inline-emoticon"/);
   assert.match(result.body, /<img class="photo" src="data:image\/png;base64,/);
+  assert.equal((result.body.match(/<img class="photo"/g) || []).length, 2);
+  assert.match(result.body, /\.card \{[^}]*break-inside: auto/);
+  assert.match(result.body, /\.photo \{[^}]*break-inside: avoid/);
 
   result = await request(`/api/howlers/${alphaEntryId}`, {
     token: alpha,
@@ -946,7 +979,7 @@ async function main() {
       quote: undefined,
       story: undefined,
       content: 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]',
-      photo: '',
+      photos: [],
       category: 'mixed',
       mood: 'hilarious',
       tags: ['shared'],
@@ -956,6 +989,7 @@ async function main() {
   });
   assert.equal(result.status, 200);
   assert.equal(result.body.entry.photo, '');
+  assert.deepEqual(result.body.entry.photos, []);
   assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photo, '');
 
   result = await request('/api/admin/stats');

@@ -117,7 +117,7 @@ Documentation and verification:
 
 ## Request flow
 
-`server.js` constructs the application dependencies and starts the listener. `server/app.js` parses the URL, dispatches explicit API and SEO routes to feature handlers, and falls back to static GET handling. Its awaited dispatch is the shared error boundary for synchronous and asynchronous route failures. JSON request bodies are limited to 2 MiB and must contain an object. Oversized requests, malformed JSON, non-object JSON, and malformed encoded paths return `400` or `413` as appropriate.
+`server.js` constructs the application dependencies and starts the listener. `server/app.js` parses the URL, dispatches explicit API and SEO routes to feature handlers, and falls back to static GET handling. Its awaited dispatch is the shared error boundary for synchronous and asynchronous route failures. JSON request bodies are limited to 5 MiB to accommodate six compressed photos and must contain an object. Oversized requests, malformed JSON, non-object JSON, and malformed encoded paths return `400` or `413` as appropriate. A reverse proxy should allow at least 6 MiB request bodies so it does not reject a valid application payload first.
 
 API responses use JSON unless the route explicitly returns HTML, XML, plain text, an export, or an SSE stream. Unmatched non-GET routes return `404`.
 
@@ -180,7 +180,7 @@ Important columns:
 - owner `user_id` and shared `family_id`
 - legacy first-child `child_name`, full `child_names_json`, `title`, `happened_on`, and `age_note`
 - legacy `quote` plus current `story`
-- `photo`, `category`, `mood`, and `tags_json`
+- legacy first-image `photo`, ordered `photos_json`, `category`, `mood`, and `tags_json`
 - `is_favorite` and `is_public`
 - optional unique `share_token` for private link sharing
 - `created_at` and `updated_at`
@@ -189,11 +189,15 @@ Important columns:
 
 The browser derives `age_note` from the entry date and every selected saved child that has a birth date. A single child keeps the compact age value. Multiple children use semicolon-separated name-to-age pairs so the stored snapshot and all feed/export views remain unambiguous. A manually edited age note is preserved.
 
-When editing, the child picker compares the existing age note with its current calculated value. A matching value is treated as automatically generated and recalculated after an event-date change; a nonmatching value remains a manual override. Entry photos render as accessible buttons that open the image-viewer dialog. The same button markup is used in client-rendered feed/detail cards and server-rendered direct post pages.
+When editing, the child picker compares the existing age note with its current calculated value. A matching value is treated as automatically generated and recalculated after an event-date change; a nonmatching value remains a manual override. Entry photos render as an ordered single-column gallery of accessible buttons that open the selected image in the image-viewer dialog. Editor previews use the same vertical order without cropping. The same entry-photo button markup is used in client-rendered feed/detail cards and server-rendered direct post pages.
 
 API objects expose derived `content` by joining non-empty `quote` and `story` values with one blank line. Current clients store the combined editor content in `story`; the old columns remain readable so earlier records are not lost.
 
-Entry photos use allowlisted raster data URLs and decode to no more than 512 KiB. Images and avatars are stored inside SQLite, so they contribute directly to database and backup size.
+`photos_json` stores up to six ordered data URLs. `photo` retains the first item for backward compatibility. Rows created before the collection column was introduced fall back to `photo` automatically, so existing images are not lost. Current API objects expose both `photos` and the compatibility `photo` value.
+
+Entry photos use allowlisted raster data URLs and each decodes to no more than 512 KiB. Images and avatars are stored inside SQLite, so they contribute directly to database and backup size.
+
+The editor processes selected photos sequentially and uses an operation generation to discard stale asynchronous results after a reset or replacement. While processing is active, further photo selection, removal, and saving are disabled. `saveEntry()` also checks the processing state defensively before constructing the request.
 
 ## Authentication and authorization
 
@@ -259,7 +263,7 @@ Authenticated state contains `app`, `viewer`, `profile`, `attention`, `summary`,
 - `POST /api/kids`: creates a child and returns `{ ok, kid }`
 - `DELETE /api/kids/:id`: removes a child from the shared list
 
-Current entry input uses `childNames` and `content`. Legacy `childName`, `quote`, and `story` input remains accepted. Every entry requires at least one child name and either non-empty text or a valid photo. A missing title is accepted for photo entries and normalized to `Снимка`. Child names are deduplicated case-insensitively and a request may contain up to 20 names. Empty category and mood use `said` and `golden`; non-empty values must be in the fixed lists from `public/js/app/constants.js`.
+Current entry input uses `childNames`, `content`, and `photos`. Legacy `childName`, `quote`, `story`, and singular `photo` input remains accepted. Every entry requires at least one child name and either non-empty text or at least one valid photo. A missing title is accepted for photo entries and normalized to `Снимка`. Child names are deduplicated case-insensitively and a request may contain up to 20 names. Empty category and mood use `said` and `golden`; non-empty values must be in the fixed lists from `public/js/app/constants.js`.
 
 New entries without `happenedOn` receive the server's current local date. The custom Bulgarian date controls display and accept `dd/mm/yyyy`, provide a themed Monday-first calendar, and convert valid values to ISO `YYYY-MM-DD` for the API and storage. Direct pages, exports, and admin timestamps also display dates as `dd/mm/yyyy`. Updates do not add a date to an intentionally undated old entry.
 
@@ -277,6 +281,8 @@ Private and public feed queries sort by immutable `created_at DESC, id DESC`. `h
 - `GET /api/export?format=pdf`: returns print-oriented HTML and opens the browser print dialog
 
 The PDF route does not generate a PDF file on the server. The user selects PDF in the browser print dialog.
+
+TXT export records the number of attached photos but cannot contain image files. Print/PDF embeds every attached photo and permits a multi-photo card to continue across pages while keeping each image intact. Neither format is a machine-restorable archive of the stored image data.
 
 ### Admin
 
@@ -309,11 +315,12 @@ Server validation enforces:
 - legacy quote up to 800 and story up to 4,000 characters
 - a real calendar date in `YYYY-MM-DD` form when present
 - fixed category and mood values
-- raster image MIME, decoded size, and matching file signature
+- zero through six ordered photos
+- raster image MIME, decoded size of at most 512 KiB per photo, and matching file signature
 
 Entry validation errors include both `error` and a stable `field` name. The editor keeps the message in its bottom alert and applies `aria-invalid`, `aria-describedby`, and the red `editor-field-invalid` style to the matching control. Editing that control clears its visual error state and the stale message.
 
-An entry must contain text or a photo. A valid photo-only entry may use any valid past date and does not require filler text.
+An entry must contain text or at least one photo. A valid photo-only entry may use any valid past date and does not require filler text.
 
 Tags are normalized by trimming, removing empty values and duplicates, and keeping at most eight.
 
@@ -401,7 +408,7 @@ npm run docs:check
 npm run hooks:install
 ```
 
-`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, duplicate emails, automatic and manual account locks, forwarded-address throttling, reset-request limits, protected accounts, password reset consumption, write-only SMTP settings, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, photos, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and direct-only admin routes.
+`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, duplicate emails, automatic and manual account locks, forwarded-address throttling, reset-request limits, protected accounts, password reset consumption, write-only SMTP settings, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, single and multiple photos, legacy-photo migration fallback, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and direct-only admin routes.
 
 `docs/*.md` files are the source of truth. `npm run docs:build` regenerates standalone HTML equivalents, while `npm run docs:html-check` fails if generated HTML is stale.
 

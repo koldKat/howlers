@@ -13,6 +13,7 @@ export const MAX_AVATAR_BYTES = domain.limits.maxAvatarBytes;
 export const MIN_PASSWORD_LENGTH = domain.limits.minPasswordLength;
 export const MAX_POST_PHOTO_BYTES = domain.limits.maxPostPhotoBytes;
 export const MAX_POST_PHOTO_DIMENSION = domain.limits.maxPostPhotoDimension;
+export const MAX_POST_PHOTOS = domain.limits.maxPostPhotos;
 
 export const CATEGORY_SLUGS = domain.categories;
 export const MOOD_SLUGS = domain.moods;

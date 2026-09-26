@@ -343,14 +343,13 @@
           </div>
         </label>
         <div id="post-photo-field" class="wide post-photo-field">
-          <span class="post-photo-label" data-i18n="form_label_photo">Снимка</span>
+          <span class="post-photo-label" data-i18n="form_label_photo">Снимки</span>
           <div class="post-photo-actions">
-            <label for="post-photo-input" class="ghost-btn small-btn post-photo-upload" data-i18n="post_photo_choose">Добави снимка</label>
-            <button id="remove-post-photo-btn" class="ghost-btn small-btn danger-btn" type="button" hidden data-i18n="post_photo_remove">Премахни</button>
+            <label for="post-photo-input" class="ghost-btn small-btn post-photo-upload" data-i18n="post_photo_choose">Добави снимки</label>
           </div>
-          <input id="post-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
-          <img id="post-photo-preview" class="post-photo-preview" src="" alt="" hidden>
-          <small id="post-photo-status" class="field-hint" data-i18n="post_photo_hint">Големите снимки се намаляват автоматично до максимум 512 KB.</small>
+          <input id="post-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden>
+          <div id="post-photo-preview" class="post-photo-preview-grid" hidden></div>
+          <small id="post-photo-status" class="field-hint" data-i18n="post_photo_hint">До 6 снимки. Големите снимки се намаляват автоматично до максимум 512 KB всяка.</small>
         </div>
         <div class="editor-advanced-toggle-row wide">
           <button id="editor-advanced-toggle" class="ghost-btn small-btn editor-advanced-toggle" type="button" aria-expanded="false" data-i18n="editor_advanced_show">Още настройки</button>

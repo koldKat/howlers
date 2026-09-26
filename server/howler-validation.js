@@ -1,6 +1,6 @@
 'use strict';
 
-const { MAX_POST_PHOTO_BYTES } = require('./config');
+const { MAX_POST_PHOTO_BYTES, MAX_POST_PHOTOS } = require('./config');
 const { childNamesFromInput } = require('./child-names');
 const { isValidLocalDate } = require('./date-validation');
 const { validateRasterImageDataUrl } = require('./image-validation');
@@ -28,7 +28,12 @@ function validateHowler(body) {
   const content = String(body.content || '').trim();
   const quote = hasCombinedContent ? '' : String(body.quote || '').trim();
   const story = hasCombinedContent ? content : String(body.story || '').trim();
-  const photo = String(body.photo || '').trim();
+  const photosInput = Object.prototype.hasOwnProperty.call(body, 'photos')
+    ? body.photos
+    : [body.photo];
+  if (!Array.isArray(photosInput)) return { error: 'Снимките трябва да са списък.', field: 'photo' };
+  const photos = photosInput.map(value => String(value || '').trim()).filter(Boolean);
+  const photo = photos[0] || '';
   const happenedOn = String(body.happenedOn || '').trim();
   const ageNote = String(body.ageNote || '').trim();
   const category = normalizeCategory(String(body.category || '').trim());
@@ -37,17 +42,20 @@ function validateHowler(body) {
   const isPublic = Boolean(body.isPublic);
   const tags = Array.isArray(body.tags) ? body.tags : String(body.tags || '').split(',');
 
-  if (!title && photo) title = 'Снимка';
+  if (photos.length > MAX_POST_PHOTOS) {
+    return { error: `Можеш да добавиш най-много ${MAX_POST_PHOTOS} снимки.`, field: 'photo' };
+  }
+  if (!title && photos.length) title = 'Снимка';
   if (!title) return { error: 'Заглавието е задължително.', field: 'title' };
-  if (!quote && !story && !photo) return { error: 'Добави текст или снимка към записа.', field: 'content' };
+  if (!quote && !story && !photos.length) return { error: 'Добави текст или снимка към записа.', field: 'content' };
   if (title.length > limits.maxEntryTitleLength) return { error: 'Заглавието е прекалено дълго.', field: 'title' };
   if (hasCombinedContent && content.length > limits.maxEntryContentLength) return { error: 'Текстът на записа е прекалено дълъг.', field: 'content' };
   if (!hasCombinedContent && quote.length > limits.maxLegacyQuoteLength) return { error: 'Репликата е прекалено дълга.', field: 'content' };
   if (!hasCombinedContent && story.length > limits.maxLegacyStoryLength) return { error: 'Историята е прекалено дълга.', field: 'content' };
   if (!VALID_CATEGORIES.has(category)) return { error: 'Невалиден вид на записа.', field: 'category' };
   if (!VALID_MOODS.has(mood)) return { error: 'Невалидно настроение.', field: 'mood' };
-  if (photo) {
-    const photoError = validateRasterImageDataUrl(photo, MAX_POST_PHOTO_BYTES, '512 KB');
+  for (const candidate of photos) {
+    const photoError = validateRasterImageDataUrl(candidate, MAX_POST_PHOTO_BYTES, '512 KB');
     if (photoError) return { error: photoError, field: 'photo' };
   }
   if (happenedOn && !isValidLocalDate(happenedOn)) {
@@ -55,7 +63,7 @@ function validateHowler(body) {
   }
 
   return {
-    childName, childNames, title, quote, story, photo, happenedOn, ageNote,
+    childName, childNames, title, quote, story, photo, photos, happenedOn, ageNote,
     category, mood, isFavorite, isPublic, tags,
   };
 }

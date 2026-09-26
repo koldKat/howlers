@@ -28,7 +28,8 @@ function sendTxtExport(req, res, session, entries) {
     if (e.category) lines.push(`Категория:  ${e.category}`);
     if (e.mood) lines.push(`Настроение: ${e.mood}`);
     if (e.content) lines.push(`\n${e.content}`);
-    if (e.photo) lines.push('[Има прикачена снимка]');
+    const photos = Array.isArray(e.photos) ? e.photos : (e.photo ? [e.photo] : []);
+    if (photos.length) lines.push(`[Прикачени снимки: ${photos.length}]`);
     if ((e.tags || []).length) lines.push(`Тагове:     ${e.tags.join(', ')}`);
     lines.push('─'.repeat(60));
   }
@@ -51,7 +52,8 @@ function sendPrintExport(res, session, entries) {
           ${e.category ? `<span class="badge">${escapeHtml(e.category)}</span>` : ''}
         </div>
         ${e.content ? `<div class="content">${renderInlineContent(e.content)}</div>` : ''}
-        ${e.photo ? `<img class="photo" src="${escapeHtml(e.photo)}" alt="">` : ''}
+        ${(Array.isArray(e.photos) ? e.photos : (e.photo ? [e.photo] : []))
+          .map(photo => `<img class="photo" src="${escapeHtml(photo)}" alt="">`).join('')}
         ${e.mood ? `<div class="mood">${escapeHtml(e.mood)}</div>` : ''}
         ${(e.tags || []).length ? `<div class="tags">${e.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
       </div>`).join('');
@@ -65,14 +67,14 @@ function sendPrintExport(res, session, entries) {
   body { font-family: Georgia, serif; font-size: 13px; color: #2c1a0e; background: #fff; padding: 28px 36px; }
   h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 0.2rem; }
   .subtitle { color: #888; font-size: 0.85rem; margin-bottom: 2rem; }
-  .card { border: 1px solid #e0d5c8; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; break-inside: avoid; }
+  .card { border: 1px solid #e0d5c8; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; break-inside: auto; }
   .card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
   .card-title { font-weight: 700; font-size: 1rem; font-family: 'Trebuchet MS', sans-serif; }
   .inline-emoticon { display: inline-block; width: 1.45em; height: 1.45em; margin: 0 0.06em; vertical-align: -0.38em; }
   .card-meta { font-size: 0.78rem; color: #888; margin-top: 2px; }
   .badge { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: #f3e9d5; color: #7a5020; white-space: nowrap; }
   .content { font-size: 0.96rem; color: #4f4036; line-height: 1.65; margin: 6px 0; }
-  .photo { display: block; max-width: 100%; max-height: 520px; object-fit: contain; border-radius: 10px; margin: 8px 0; }
+  .photo { display: block; max-width: 100%; max-height: 520px; object-fit: contain; border-radius: 10px; margin: 8px 0; break-inside: avoid; }
   .mood { font-size: 0.75rem; color: #888; margin-top: 6px; }
   .tags { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
   .tag { font-size: 0.7rem; padding: 1px 7px; border-radius: 99px; background: #ede8f0; color: #5a3a7a; }

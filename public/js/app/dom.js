@@ -128,7 +128,6 @@ export function getAppElements() {
     postPhotoInput: document.getElementById('post-photo-input'),
     postPhotoPreview: document.getElementById('post-photo-preview'),
     postPhotoStatus: document.getElementById('post-photo-status'),
-    removePostPhotoBtn: document.getElementById('remove-post-photo-btn'),
     ageNote:       document.getElementById('age-note'),
     tags:          document.getElementById('tags'),
     isFavorite:    document.getElementById('is-favorite'),
