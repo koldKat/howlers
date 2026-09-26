@@ -53,7 +53,7 @@ export function renderEntryPhotos(entry) {
   const photoAlt = t('entry_photo_alt', { title: entry.title });
   return `<div class="entry-photo-gallery">${photos.map((photo, index) => {
     const position = photos.length > 1 ? ` ${index + 1}/${photos.length}` : '';
-    return `<button class="entry-photo-button" type="button" data-view-photo aria-label="${escapeHtml(t('entry_photo_open'))}${position}"><img class="entry-photo" src="${escapeHtml(photo)}" alt="${escapeHtml(photoAlt)}${position}"></button>`;
+    return `<button class="entry-photo-button" type="button" data-view-photo aria-label="${escapeHtml(t('entry_photo_open'))}${position}"><img class="entry-photo" src="${escapeHtml(photo)}" alt="${escapeHtml(photoAlt)}${position}" loading="lazy" decoding="async"></button>`;
   }).join('')}</div>`;
 }
 

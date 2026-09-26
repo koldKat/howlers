@@ -25,6 +25,10 @@
   "hero_copy": "Малък домашен архив за смешните неща, казани и направени от децата, с бързо записване, любими и търсима хронология.",
   "logout_btn": "Изход",
   "status_pill": "Архивът работи",
+  "feed_page_previous": "Предишна",
+  "feed_page_next": "Следваща",
+  "feed_page_status": "Страница {page} от {pages}",
+  "archive_kicker_search": "Показани {shown} от {total} намерени",
 
   "panel_recent_title": "Последна активност",
   "panel_recent_kicker": "Наскоро редактирани записи",

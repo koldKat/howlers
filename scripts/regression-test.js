@@ -123,6 +123,9 @@ async function main() {
   assert.match(result.body, /id="kid-dob-input" data-date-picker[^>]*placeholder="дд\/мм\/гггг"/);
   assert.match(result.body, /id="date-picker-dialog"/);
   assert.match(result.body, /id="image-viewer-dialog"/);
+  assert.match(result.body, /id="feed-pagination"/);
+  assert.match(result.body, /id="feed-page-previous"/);
+  assert.match(result.body, /id="feed-page-next"/);
   assert.match(result.body, /id="post-photo-input"[^>]*multiple/);
   assert.match(result.body, /id="post-photo-preview" class="post-photo-preview-grid"/);
   assert.match(result.body, /<nav class="site-nav">[\s\S]*id="mobile-family-settings"[\s\S]*<\/nav>/);
@@ -201,10 +204,23 @@ async function main() {
   assert.match(result.body, /input\.editor-field-invalid[\s\S]*border-color:\s*#cf3f5b/);
   assert.match(result.body, /#mobile-family-settings,\s*\.mobile-sidebar-head\s*\{ display: none; \}/);
   assert.match(result.body, /@media \(max-width: 860px\)[\s\S]*#mobile-family-settings\s*\{ display: inline-flex; \}/);
+  assert.match(result.body, /\.site-nav\s*\{[\s\S]*background:[\s\S]*#9fe2ff/);
 
   result = await request('/js/app/feed.js', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, /export function createFeedController/);
+  assert.match(result.body, /\/api\/howlers/);
+  assert.match(result.body, /nextPage:\s*\(\) =>/);
+  assert.match(result.body, /previousPage:\s*\(\) =>/);
+  assert.match(result.body, /function scrollToPageTop\(\)[\s\S]*requestAnimationFrame[\s\S]*scrollIntoView/);
+  assert.doesNotMatch(result.body, /mergeEntries|\.\.\.existing|append\s*=/);
+  assert.match(result.body, /function usesPublicFeed/);
+  assert.match(result.body, /if \(!searchResult\) \{\s*requestSequence \+= 1/);
+  assert.match(result.body, /els\.searchInput\.value = ''/);
+
+  result = await request('/js/app/entry-presentation.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /loading="lazy" decoding="async"/);
 
   result = await request('/js/app/post-detail.js', { raw: true });
   assert.equal(result.status, 200);
@@ -541,7 +557,8 @@ async function main() {
   assert.equal(result.body.entry.happenedOn, '2018-03-14');
   assert.equal(result.body.state.entries[0].id, backdatedPhotoId);
   result = await request('/api/feed');
-  assert.equal(result.body[0].id, backdatedPhotoId);
+  assert.equal(result.body.entries[0].id, backdatedPhotoId);
+  assert.equal(result.body.page.offset, 0);
   assert.equal((await request(`/api/howlers/${backdatedPhotoId}`, {
     token: alpha,
     method: 'DELETE',
@@ -778,19 +795,40 @@ async function main() {
   ]);
 
   result = await request('/api/feed');
-  assert.equal(result.body.some(entry => entry.id === alphaEntryId), true);
-  assert.equal(result.body.find(entry => entry.id === alphaEntryId).title, 'Edited [b]:laugh: by beta[/b]');
-  assert.match(result.body.find(entry => entry.id === alphaEntryId).content, /Shared \[u\]:surprised:/);
-  assert.equal(result.body.find(entry => entry.id === alphaEntryId).photo, TINY_PNG);
-  assert.equal(result.body.find(entry => entry.id === alphaEntryId).photos.length, 2);
-  assert.deepEqual(result.body.find(entry => entry.id === alphaEntryId).childNames, ['Mila', 'Niki']);
-  assert.deepEqual(result.body.find(entry => entry.id === alphaEntryId).tags, []);
-  assert.equal(result.body.some(entry => entry.id === betaEntryId), false);
+  assert.equal(result.body.entries.some(entry => entry.id === alphaEntryId), true);
+  assert.equal(result.body.entries.find(entry => entry.id === alphaEntryId).title, 'Edited [b]:laugh: by beta[/b]');
+  assert.match(result.body.entries.find(entry => entry.id === alphaEntryId).content, /Shared \[u\]:surprised:/);
+  assert.equal(result.body.entries.find(entry => entry.id === alphaEntryId).photo, TINY_PNG);
+  assert.equal(result.body.entries.find(entry => entry.id === alphaEntryId).photos.length, 2);
+  assert.deepEqual(result.body.entries.find(entry => entry.id === alphaEntryId).childNames, ['Mila', 'Niki']);
+  assert.deepEqual(result.body.entries.find(entry => entry.id === alphaEntryId).tags, []);
+  assert.equal(result.body.entries.some(entry => entry.id === betaEntryId), false);
 
   result = await request('/api/state', { token: alpha });
   assert.deepEqual(result.body.entries.find(entry => entry.id === alphaEntryId).tags, ['shared']);
+  assert.ok(result.body.entries.length <= domain.limits.feedPageSize);
+  assert.equal(result.body.entriesPage.offset, 0);
+  assert.equal(Object.prototype.hasOwnProperty.call(result.body.summary, 'recent'), false);
   assert.equal(JSON.stringify(result.body).includes('share_token'), false);
   assert.equal(JSON.stringify(result.body).includes('shareToken'), false);
+
+  result = await request('/api/howlers?limit=1', { token: alpha });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.entries.length, 1);
+  assert.equal(result.body.page.hasPrevious, false);
+  assert.equal(result.body.page.hasMore, true);
+  const firstPageEntryId = result.body.entries[0].id;
+  result = await request(`/api/howlers?limit=1&offset=${result.body.page.nextOffset}`, { token: alpha });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.page.hasPrevious, true);
+  assert.equal(result.body.page.previousOffset, 0);
+  assert.equal(result.body.entries.length, 1);
+  assert.notEqual(result.body.entries[0].id, firstPageEntryId);
+
+  result = await request('/api/howlers?limit=1&q=SHARED', { token: alpha });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.page.total, 1);
+  assert.equal(result.body.entries[0].id, alphaEntryId);
 
   result = await request(`/api/howlers/${alphaEntryId}/share`, { token: alpha, method: 'POST' });
   assert.equal(result.status, 200);
@@ -1085,6 +1123,40 @@ async function main() {
   assert.equal(result.status, 200);
   assert.equal(result.body.state.entries.some(entry => entry.id === betaEntryId), false);
   assert.equal((await request(`/api/shared/${privateShareToken}`)).status, 404);
+
+  const pagingDb = new Database(databasePath);
+  const pagingOwner = pagingDb.prepare(`SELECT u.id, fm.family_id FROM users u
+    JOIN family_members fm ON fm.user_id = u.id WHERE u.username = ?`).get('alpha');
+  const insertPagingEntry = pagingDb.prepare(`INSERT INTO howlers (
+    user_id, family_id, child_name, child_names_json, title, story, category, happened_on, mood
+  ) VALUES (?, ?, 'Mila', '["Mila"]', ?, ?, 'said', '2026-08-01', 'golden')`);
+  const pagingIds = pagingDb.transaction(() => Array.from({ length: domain.limits.feedPageSize + 1 }, (_value, index) =>
+    Number(insertPagingEntry.run(
+      pagingOwner.id,
+      pagingOwner.family_id,
+      index === 0 ? 'Deep archive needle' : `Page filler ${index}`,
+      `Paged content ${index}`
+    ).lastInsertRowid)
+  ))();
+  pagingDb.close();
+
+  result = await request('/api/state', { token: alpha });
+  assert.equal(result.body.entries.length, domain.limits.feedPageSize);
+  assert.equal(domain.limits.feedPageSize, 25);
+  assert.equal(result.body.entriesPage.hasMore, true);
+  const firstDefaultPageIds = new Set(result.body.entries.map(entry => entry.id));
+  result = await request(`/api/howlers?offset=${result.body.entriesPage.nextOffset}`, { token: alpha });
+  assert.ok(result.body.entries.length > 0);
+  assert.equal(result.body.entries.some(entry => firstDefaultPageIds.has(entry.id)), false);
+
+  result = await request('/api/howlers?q=deep%20archive%20needle', { token: alpha });
+  assert.equal(result.body.page.total, 1);
+  assert.equal(result.body.entries[0].title, 'Deep archive needle');
+
+  const pagingCleanupDb = new Database(databasePath);
+  const placeholders = pagingIds.map(() => '?').join(', ');
+  pagingCleanupDb.prepare(`DELETE FROM howlers WHERE id IN (${placeholders})`).run(...pagingIds);
+  pagingCleanupDb.close();
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     assert.equal((await request('/api/login', {

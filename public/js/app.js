@@ -265,12 +265,13 @@ function openEvents() {
       handleSessionExpired();
       return;
     }
-    if (payload.publicFeed) feedController.setPublicFeed(payload.publicFeed);
     if (payload.entries || payload.summary || payload.attention || payload.viewer) {
       feedController.render(payload);
       return;
     }
-    feedController.renderPublicFeed();
+    if (payload.publicFeed) {
+      feedController.handlePublicUpdate(payload.publicFeed, payload.publicFeedPage);
+    }
   };
   eventSource.onerror = () => {};
 }
@@ -428,6 +429,8 @@ els.resetBtn.addEventListener('click', resetForm);
 els.deleteBtn.addEventListener('click', deleteEntry);
 
 els.searchInput.addEventListener('input', () => feedController.scheduleRender());
+els.feedPagePrevious.addEventListener('click', feedController.previousPage);
+els.feedPageNext.addEventListener('click', feedController.nextPage);
 
 els.feedList.addEventListener('click', event => {
   const openLink = event.target.closest('[data-open-post-id]');

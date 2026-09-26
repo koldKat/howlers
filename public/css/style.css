@@ -125,7 +125,8 @@ select {
   min-height: var(--nav-h);
   border-bottom: 1px solid rgba(255, 255, 255, 0.3);
   background:
-    linear-gradient(135deg, rgba(255, 244, 196, 0.5), rgba(255, 224, 190, 0.42) 42%, rgba(255, 241, 213, 0.26));
+    linear-gradient(135deg, rgba(255, 244, 196, 0.5), rgba(255, 224, 190, 0.42) 42%, rgba(255, 241, 213, 0.26)),
+    #9fe2ff;
   box-shadow: 0 10px 24px rgba(68, 102, 164, 0.08);
 }
 .nav-inner {
@@ -509,7 +510,22 @@ select {
 .badge.custom { background: rgba(100,100,100,0.12); color: #555; }
 
 /* ── Feed entries ── */
-.stack-list { display: grid; gap: 7px; }
+.stack-list { display: grid; gap: 7px; scroll-margin-top: calc(var(--nav-h) + 0.75rem); }
+.feed-pagination {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) auto minmax(100px, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  padding-top: 0.65rem;
+}
+.feed-pagination[hidden] { display: none; }
+.feed-page-button:first-child { justify-self: end; }
+.feed-page-button:last-child { justify-self: start; }
+.feed-page-status { color: var(--muted); font-size: 0.86rem; font-weight: 700; text-align: center; }
+@media (max-width: 480px) {
+  .feed-pagination { grid-template-columns: 1fr auto 1fr; gap: 0.4rem; }
+  .feed-page-button { min-width: 0; padding-inline: 0.65rem; }
+}
 .feed-loading {
   min-height: clamp(190px, 32vh, 310px);
   display: flex;

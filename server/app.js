@@ -68,11 +68,18 @@ function createRequestHandler({ sseHub }) {
       if (invite && invite[2] === 'accept' && req.method === 'POST') return families.acceptInvite(req, res, Number(invite[1]));
       if (invite && !invite[2] && req.method === 'DELETE') return families.cancelInvite(req, res, Number(invite[1]));
 
+      if (req.method === 'GET' && url.pathname === '/api/howlers') return entries.list(req, res, url);
       if (req.method === 'POST' && url.pathname === '/api/howlers') return entries.create(req, res);
       if (howlerShare && req.method === 'POST') return entries.share(req, res, Number(howlerShare[1]));
       if (howler && req.method === 'PUT') return entries.update(req, res, Number(howler[1]));
       if (howler && req.method === 'DELETE') return entries.remove(req, res, Number(howler[1]));
-      if (req.method === 'GET' && url.pathname === '/api/feed') return send(res, 200, db.listPublicHowlers());
+      if (req.method === 'GET' && url.pathname === '/api/feed') {
+        return send(res, 200, db.listPublicHowlersPage({
+          offset: url.searchParams.get('offset'),
+          limit: url.searchParams.get('limit'),
+          query: url.searchParams.get('q'),
+        }));
+      }
       if (publicHowler && req.method === 'GET') {
         const entry = db.getPublicHowler(Number(publicHowler[1]));
         return entry ? send(res, 200, entry) : send(res, 404, { error: 'Записът не е намерен.' });

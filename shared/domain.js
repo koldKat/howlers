@@ -17,6 +17,8 @@
     maxPostPhotoBytes: 512 * 1024,
     maxPostPhotoDimension: 1600,
     maxPostPhotos: 6,
+    feedPageSize: 25,
+    maxFeedPageSize: 50,
     maxUsernameLength: 60,
     maxDisplayNameLength: 60,
     maxChildNameLength: 60,

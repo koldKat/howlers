@@ -6,6 +6,17 @@ const { validateHowler } = require('../howler-validation');
 const { buildState } = require('../state');
 
 function createEntryHandlers({ sseHub }) {
+  async function list(req, res, url) {
+    const session = await authenticate(req, res);
+    if (!session) return;
+    const result = db.listHowlersPage(session.user_id, {
+      offset: url.searchParams.get('offset'),
+      limit: url.searchParams.get('limit'),
+      query: url.searchParams.get('q'),
+    });
+    send(res, 200, result);
+  }
+
   async function create(req, res) {
     const session = await authenticate(req, res);
     if (!session) return;
@@ -62,7 +73,7 @@ function createEntryHandlers({ sseHub }) {
     send(res, 200, { path });
   }
 
-  return { create, update, remove, share };
+  return { list, create, update, remove, share };
 }
 
 module.exports = { createEntryHandlers };

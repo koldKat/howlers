@@ -117,6 +117,8 @@ function initializeSchema(db) {
   addColumnIfMissing(db, 'sessions', 'last_active_at', 'ALTER TABLE sessions ADD COLUMN last_active_at INTEGER');
   addColumnIfMissing(db, 'kids', 'family_id', 'ALTER TABLE kids ADD COLUMN family_id INTEGER');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_howlers_share_token ON howlers(share_token) WHERE share_token IS NOT NULL');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_howlers_family_feed ON howlers(family_id, created_at DESC, id DESC)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_howlers_public_feed ON howlers(is_public, created_at DESC, id DESC)');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL');
   db.exec('CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens(user_id, expires_at)');
 

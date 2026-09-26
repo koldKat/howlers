@@ -3,6 +3,7 @@ const db = require('./connection');
 const { childNamesFromRow } = require('../child-names');
 const { buildMultiChildAgeNote } = require('../entry-ages');
 const { getFamilyIdForUser } = require('./families');
+const { FEED_PAGE_SIZE, MAX_FEED_PAGE_SIZE } = require('../config');
 
 function normalizeTags(tags) {
   const list = Array.isArray(tags) ? tags : String(tags || '').split(',');
@@ -43,6 +44,93 @@ function mapEntry(row, familyKids = []) {
     createdAt: row.created_at ? Number(row.created_at) : null,
     updatedAt: row.updated_at ? Number(row.updated_at) : null,
   };
+}
+
+function pageOptions(options = {}) {
+  const requestedOffset = Number.parseInt(options.offset, 10);
+  const offset = Number.isSafeInteger(requestedOffset) && requestedOffset > 0
+    ? Math.min(requestedOffset, 1_000_000_000)
+    : 0;
+  const requestedLimit = Number.parseInt(options.limit, 10) || FEED_PAGE_SIZE;
+  const limit = Math.max(1, Math.min(requestedLimit, MAX_FEED_PAGE_SIZE));
+  return { offset, limit, query: String(options.query || '').trim().toLocaleLowerCase('bg-BG') };
+}
+
+function searchableRowText(row, includeTags) {
+  return [
+    row.child_name,
+    row.child_names_json,
+    row.title,
+    row.quote,
+    row.story,
+    row.age_note,
+    includeTags ? row.tags_json : '',
+  ].join(' ').toLocaleLowerCase('bg-BG');
+}
+
+function rowsByIds(ids) {
+  if (!ids.length) return [];
+  const placeholders = ids.map(() => '?').join(', ');
+  const byId = new Map(db.prepare(`SELECT * FROM howlers WHERE id IN (${placeholders})`)
+    .all(...ids).map(row => [row.id, row]));
+  return ids.map(id => byId.get(id)).filter(Boolean);
+}
+
+function pageResult(entries, offset, limit, total) {
+  const nextOffset = offset + entries.length;
+  return {
+    entries,
+    page: {
+      offset,
+      limit,
+      total,
+      hasPrevious: offset > 0,
+      previousOffset: Math.max(0, offset - limit),
+      hasMore: nextOffset < total,
+      nextOffset,
+    },
+  };
+}
+
+function listHowlersPage(userId, options = {}) {
+  const familyId = getFamilyIdForUser(userId);
+  const familyKids = listFamilyKids(familyId);
+  const { offset, limit, query } = pageOptions(options);
+  if (!query) {
+    const total = Number(db.prepare('SELECT COUNT(*) AS total FROM howlers WHERE family_id = ?').get(familyId).total);
+    const rows = db.prepare(`SELECT * FROM howlers WHERE family_id = ?
+      ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`).all(familyId, limit, offset);
+    return pageResult(rows.map(row => mapEntry(row, familyKids)), offset, limit, total);
+  }
+
+  const matches = db.prepare(`SELECT id, child_name, child_names_json, title, quote, story, age_note, tags_json
+    FROM howlers WHERE family_id = ? ORDER BY created_at DESC, id DESC`).all(familyId)
+    .filter(row => searchableRowText(row, true).includes(query));
+  const rows = rowsByIds(matches.slice(offset, offset + limit).map(row => row.id));
+  return pageResult(rows.map(row => mapEntry(row, familyKids)), offset, limit, matches.length);
+}
+
+function listPublicHowlersPage(options = {}) {
+  const { offset, limit, query } = pageOptions(options);
+  let total;
+  let rows;
+  if (!query) {
+    total = Number(db.prepare('SELECT COUNT(*) AS total FROM howlers WHERE is_public = 1').get().total);
+    rows = db.prepare(`SELECT * FROM howlers WHERE is_public = 1
+      ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`).all(limit, offset);
+  } else {
+    const matches = db.prepare(`SELECT id, child_name, child_names_json, title, quote, story, age_note, tags_json
+      FROM howlers WHERE is_public = 1 ORDER BY created_at DESC, id DESC`).all()
+      .filter(row => searchableRowText(row, false).includes(query));
+    total = matches.length;
+    rows = rowsByIds(matches.slice(offset, offset + limit).map(row => row.id));
+  }
+  const kidsByFamily = new Map();
+  const entries = rows.map(row => {
+    if (!kidsByFamily.has(row.family_id)) kidsByFamily.set(row.family_id, listFamilyKids(row.family_id));
+    return { ...mapEntry(row, kidsByFamily.get(row.family_id)), tags: [] };
+  });
+  return pageResult(entries, offset, limit, total);
 }
 
 function listHowlers(userId) {
@@ -162,19 +250,16 @@ function getSummary(userId) {
   const kids = [...childCounts.values()].sort((a, b) =>
     b.total - a.total || a.childName.localeCompare(b.childName, 'bg-BG')
   );
-  const familyKids = listFamilyKids(familyId);
-  const recent = db.prepare('SELECT * FROM howlers WHERE family_id = ? ORDER BY updated_at DESC, id DESC LIMIT 6')
-    .all(familyId).map(row => mapEntry(row, familyKids));
   return {
     total: Number(totals.total || 0), favorites: Number(totals.favorites || 0), kids: kids.length,
     firstCreatedAt: totals.first_created_at ? Number(totals.first_created_at) : null,
     lastUpdatedAt: totals.last_updated_at ? Number(totals.last_updated_at) : null,
     categories: categoryRows.map(row => ({ label: row.category, total: Number(row.total || 0) })),
-    kidsBreakdown: kids, recent,
+    kidsBreakdown: kids,
   };
 }
 
 module.exports = {
-  listHowlers, createHowler, updateHowler, deleteHowler, getSummary,
-  listPublicHowlers, getPublicHowler, getSharedHowler, getSharePath,
+  listHowlers, listHowlersPage, createHowler, updateHowler, deleteHowler, getSummary,
+  listPublicHowlers, listPublicHowlersPage, getPublicHowler, getSharedHowler, getSharePath,
 };

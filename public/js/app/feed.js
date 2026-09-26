@@ -1,27 +1,32 @@
 import { t } from '../i18n.js';
+import { apiFetch } from './api.js';
 import { categoryClass, categoryLabel, entryMetaLine, renderEntryPhotos, renderInlineContent } from './entry-presentation.js';
 import { escapeHtml } from './format.js';
 
 export function createFeedController(els, { feedLoader, onKids, onProfileState, onViewer }) {
   let latestState = null;
   let latestFeed = [];
+  let publicFeedPage = null;
   let renderTimer = null;
+  let requestSequence = 0;
+  let loadingPage = false;
 
   function formatDateTimeFromUnix(value) {
     return value ? new Date(Number(value) * 1000).toLocaleString('bg-BG') : t('date_na');
   }
 
   function query() {
-    return els.searchInput.value.trim().toLowerCase();
+    return els.searchInput.value.trim();
   }
 
-  function filterEntries(entries) {
-    const value = query();
-    if (!value) return entries;
-    return entries.filter(entry =>
-      [entry.childName, entry.title, entry.content, entry.quote, entry.story, entry.ageNote, ...(entry.tags || [])]
-        .join(' ').toLowerCase().includes(value)
-    );
+  function usesPublicFeed() {
+    return !latestState?.viewer || (!query() && latestState.summary?.total === 0);
+  }
+
+  function pageUrl(path, offset) {
+    const params = new URLSearchParams({ offset: String(offset || 0) });
+    if (query()) params.set('q', query());
+    return `${path}?${params}`;
   }
 
   function entryCard(entry, editable) {
@@ -53,26 +58,75 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
       : `<span class="data-chip">${escapeHtml(t('no_data_chip'))}</span>`;
   }
 
-  function renderPublicFeed(entries) {
+  function renderPagination(page) {
+    const totalPages = page?.limit ? Math.ceil(page.total / page.limit) : 0;
+    els.feedPagination.hidden = totalPages <= 1;
+    els.feedPagePrevious.disabled = loadingPage || !page?.hasPrevious;
+    els.feedPageNext.disabled = loadingPage || !page?.hasMore;
+    els.feedPageStatus.textContent = totalPages
+      ? t('feed_page_status', {
+          page: Math.floor(page.offset / page.limit) + 1,
+          pages: totalPages,
+        })
+      : '';
+  }
+
+  function scrollToPageTop() {
+    requestAnimationFrame(() => {
+      els.feedList.scrollIntoView({ behavior: 'auto', block: 'start' });
+    });
+  }
+
+  function renderPublicFeed(entries = latestFeed, page = publicFeedPage) {
     latestFeed = Array.isArray(entries) ? entries : [];
+    publicFeedPage = page || null;
     els.feedList.innerHTML = latestFeed.length
       ? latestFeed.map(entry => entryCard(entry, false)).join('')
-      : `<div class="empty-state">${escapeHtml(t('feed_empty'))}</div>`;
+      : `<div class="empty-state">${escapeHtml(query() ? t('empty_no_filter_match') : t('feed_empty'))}</div>`;
+    renderPagination(publicFeedPage);
   }
 
   async function loadPublicFeed() {
     feedLoader.show(t('feed_loading'));
     try {
-      const response = await fetch('/api/feed');
-      renderPublicFeed(await response.json());
+      const response = await fetch(pageUrl('/api/feed', 0));
+      if (!response.ok) throw new Error('Feed request failed');
+      const result = await response.json();
+      renderPublicFeed(result.entries || [], result.page);
     } catch {
-      renderPublicFeed([]);
+      renderPublicFeed([], null);
     }
   }
 
-  function render(state) {
+  function render(state, { searchResult = false } = {}) {
+    if (!searchResult) {
+      requestSequence += 1;
+      loadingPage = false;
+    }
+    const previousState = latestState;
+    const previousPublicOffset = publicFeedPage?.offset || 0;
+    const preservePublicPage = !query()
+      && state.viewer
+      && state.summary?.total === 0
+      && previousState?.viewer
+      && previousPublicOffset > 0
+      && !searchResult;
+    if (query() && state.viewer && !searchResult) {
+      if (previousState?.viewer) {
+        state = { ...state, entries: previousState.entries, entriesPage: previousState.entriesPage };
+      }
+      scheduleRender(0, previousState?.entriesPage?.offset || 0);
+    } else if (state.viewer && previousState?.viewer && previousState.entriesPage?.offset > 0 && !searchResult) {
+      state = { ...state, entries: previousState.entries, entriesPage: previousState.entriesPage };
+      scheduleRender(0, previousState.entriesPage.offset);
+    } else if (preservePublicPage) {
+      scheduleRender(0, previousPublicOffset);
+    }
     latestState = state;
-    if (state.publicFeed) latestFeed = Array.isArray(state.publicFeed) ? state.publicFeed : [];
+    if (state.publicFeed && !preservePublicPage) {
+      latestFeed = Array.isArray(state.publicFeed) ? state.publicFeed : [];
+      publicFeedPage = state.publicFeedPage || null;
+    }
     if (state.viewer) onViewer(state.viewer);
     onProfileState(state);
 
@@ -103,35 +157,84 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
     if (state.kids) onKids(state.kids);
 
     const ownEntries = state.entries || [];
-    const publicFallback = ownEntries.length === 0;
-    const filtered = filterEntries(publicFallback ? latestFeed : ownEntries);
+    const publicFallback = !query() && state.summary.total === 0;
     if (publicFallback) {
       els.archiveKicker.textContent = '';
-      els.feedList.innerHTML = filtered.length
-        ? filtered.map(entry => entryCard(entry, false)).join('')
-        : `<div class="empty-state">${escapeHtml(t(query() ? 'empty_no_filter_match' : 'feed_empty'))}</div>`;
+      renderPublicFeed();
       return;
     }
-    const total = ownEntries.length;
-    els.archiveKicker.textContent = filtered.length === total
-      ? t(total === 1 ? 'archive_kicker_all_one' : 'archive_kicker_all_many', { total })
-      : t('archive_kicker_filtered', { filtered: filtered.length, total });
-    els.feedList.innerHTML = filtered.length
-      ? filtered.map(entry => entryCard(entry, true)).join('')
-      : `<div class="empty-state">${escapeHtml(t('empty_no_filter_match'))}</div>`;
+
+    const page = state.entriesPage;
+    els.archiveKicker.textContent = query()
+      ? t('archive_kicker_search', { shown: ownEntries.length, total: page?.total || 0 })
+      : t(state.summary.total === 1 ? 'archive_kicker_all_one' : 'archive_kicker_all_many', {
+          total: state.summary.total,
+        });
+    els.feedList.innerHTML = ownEntries.length
+      ? ownEntries.map(entry => entryCard(entry, true)).join('')
+      : `<div class="empty-state">${escapeHtml(query() ? t('empty_no_filter_match') : t('feed_empty'))}</div>`;
+    renderPagination(page);
   }
 
-  function scheduleRender(delay = 120) {
+  async function loadPage(offset = 0, { scroll = false } = {}) {
+    const authenticatedArchive = !usesPublicFeed();
+    const page = authenticatedArchive ? latestState?.entriesPage : publicFeedPage;
+    const sequence = ++requestSequence;
+    loadingPage = true;
+    renderPagination(page);
+    try {
+      const result = authenticatedArchive
+        ? await apiFetch(pageUrl('/api/howlers', offset))
+        : await fetch(pageUrl('/api/feed', offset)).then(response => {
+            if (!response.ok) throw new Error('Feed request failed');
+            return response.json();
+          });
+      if (sequence !== requestSequence) return;
+      if (!result.entries?.length && offset > 0 && result.page?.total > 0) {
+        const lastOffset = Math.floor((result.page.total - 1) / result.page.limit) * result.page.limit;
+        loadingPage = false;
+        return loadPage(lastOffset, { scroll });
+      }
+      if (authenticatedArchive) {
+        latestState = { ...latestState, entries: result.entries || [], entriesPage: result.page };
+        render(latestState, { searchResult: true });
+      } else {
+        renderPublicFeed(result.entries || [], result.page);
+      }
+      if (scroll) scrollToPageTop();
+    } catch {
+      if (offset === 0 && !authenticatedArchive) renderPublicFeed([], null);
+    } finally {
+      if (sequence === requestSequence) {
+        loadingPage = false;
+        renderPagination(authenticatedArchive ? latestState?.entriesPage : publicFeedPage);
+      }
+    }
+  }
+
+  function scheduleRender(delay = 180, offset = 0) {
     if (!latestState) return;
+    requestSequence += 1;
+    loadingPage = false;
     if (renderTimer) clearTimeout(renderTimer);
     renderTimer = setTimeout(() => {
       renderTimer = null;
-      render(latestState);
+      loadPage(offset);
     }, delay);
   }
 
-  function setPublicFeed(entries) {
-    latestFeed = Array.isArray(entries) ? entries : [];
+  function handlePublicUpdate(entries, page) {
+    requestSequence += 1;
+    loadingPage = false;
+    if (query()) {
+      loadPage(0);
+      return;
+    }
+    if (publicFeedPage?.offset > 0) {
+      loadPage(publicFeedPage.offset);
+      return;
+    }
+    renderPublicFeed(entries, page);
   }
 
   function findEntry(id) {
@@ -142,13 +245,27 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
   }
 
   return {
-    clearState: () => { latestState = null; },
+    clearState: () => {
+      latestState = null;
+      latestFeed = [];
+      publicFeedPage = null;
+      els.searchInput.value = '';
+      requestSequence += 1;
+      renderPagination(null);
+    },
     currentState: () => latestState,
     findEntry,
+    handlePublicUpdate,
+    nextPage: () => {
+      const page = usesPublicFeed() ? publicFeedPage : latestState?.entriesPage;
+      if (!loadingPage && page?.hasMore) loadPage(page.nextOffset, { scroll: true });
+    },
+    previousPage: () => {
+      const page = usesPublicFeed() ? publicFeedPage : latestState?.entriesPage;
+      if (!loadingPage && page?.hasPrevious) loadPage(page.previousOffset, { scroll: true });
+    },
     loadPublicFeed,
     render,
-    renderPublicFeed: () => renderPublicFeed(latestFeed),
     scheduleRender,
-    setPublicFeed,
   };
 }

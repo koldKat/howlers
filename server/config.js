@@ -14,6 +14,8 @@ const MAX_REQUEST_BYTES = 5 * 1024 * 1024;
 const MAX_AVATAR_BYTES = domain.limits.maxAvatarBytes;
 const MAX_POST_PHOTO_BYTES = domain.limits.maxPostPhotoBytes;
 const MAX_POST_PHOTOS = domain.limits.maxPostPhotos;
+const FEED_PAGE_SIZE = domain.limits.feedPageSize;
+const MAX_FEED_PAGE_SIZE = domain.limits.maxFeedPageSize;
 const PROTECTED_ADMIN_USERS = new Set(['slanchoff', 'koldkat']);
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://biseri.net').replace(/\/$/, '');
 const AUTH_FAILURE_WINDOW_MS = 15 * 60 * 1000;
@@ -45,6 +47,8 @@ module.exports = {
   MAX_AVATAR_BYTES,
   MAX_POST_PHOTO_BYTES,
   MAX_POST_PHOTOS,
+  FEED_PAGE_SIZE,
+  MAX_FEED_PAGE_SIZE,
   PROTECTED_ADMIN_USERS,
   PUBLIC_URL,
   AUTH_FAILURE_WINDOW_MS,

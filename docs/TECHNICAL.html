@@ -102,7 +102,7 @@ npm start</code></pre>
 <li><code>public/js/app/date-picker.js</code>: Bulgarian <code>dd/mm/yyyy</code> input masking and themed calendar dialog</li>
 <li><code>public/js/app/editor-tools.js</code>: cursor-aware shared formatting and emoticon controls, shortcuts, photo processing, and editor controls; the shared tool strip keeps formatting left and a horizontally scrollable emote row right without a visible scrollbar</li>
 <li><code>public/js/app/entry-presentation.js</code>: entry labels, metadata, inline formatting, and SVG emoticon rendering</li>
-<li><code>public/js/app/feed.js</code>: public and private feed rendering, filtering, and summary presentation</li>
+<li><code>public/js/app/feed.js</code>: paged public and private feed loading, archive-wide search, rendering, and summary presentation</li>
 <li><code>public/js/app/feed-loading.js</code>: reusable feed-loader cloning and localized status updates</li>
 <li><code>public/js/app/auth.js</code>: login, registration, forgot-password, and reset-password controller</li>
 <li><code>public/js/app/post-detail.js</code>: public/private-link detail dialog, browser history, and Web Share integration</li>
@@ -115,6 +115,7 @@ npm start</code></pre>
 <li><code>public/admin.html</code>, <code>public/js/admin.js</code>, <code>public/js/admin/*</code>, <code>public/css/admin.css</code>: admin panel</li>
 </ul>
 <p>The page footer follows the Gamebooks and games-app family branding: <strong>koldKat productions</strong> followed by a copyright year. It reuses the page grid but occupies only the feed column, so its text is centered under the feed rather than the viewport. Dark burnt orange and slate text keep the notice readable over the grass band. <code>COPYRIGHT_START_YEAR</code> is defined in <code>public/js/app/constants.js</code>; the browser keeps <code>2026</code> during the starting year and automatically expands it to a normal-hyphen year range later.</p>
+<p>The sticky <code>.site-nav</code> retains its translucent decorative gradient over an opaque sky-colored base. The opaque base prevents feed cards and text from showing through the navigation controls while the document scrolls.</p>
 <p><code>shared/domain.js</code> is the source of truth for brand copy used by runtime code, post categories and moods, emoticon slugs and asset path, and limits that must agree between the browser and server. It uses a small UMD wrapper: Node loads it with <code>require()</code>, while <code>index.html</code> loads <code>/js/domain.js</code> before the ES-module application. Static index metadata remains in HTML for crawlers. Direct post pages add <code>#post-detail-schema</code>; the client removes only that ID on close and preserves <code>#website-schema</code>.</p>
 <p>Documentation and verification:</p>
 <ul>
@@ -132,6 +133,7 @@ npm start</code></pre>
 <p>Static serving resolves paths below <code>public/</code> and rejects traversal outside that root.</p>
 <p>The install manifest exposes the SVG favicon with <code>purpose: any</code> and opaque 192 px and 512 px PNG icons with <code>purpose: any maskable</code>. The maskable declaration lets adaptive Android launchers clip the sky-blue <code>#57b9ff</code> canvas directly instead of placing it inside a white fallback circle. New sky-icon filenames prevent reuse of older cached black icon files. The separate 180 px Apple touch icon uses the same sun artwork on the same sky-blue background. The manifest uses <code>#57b9ff</code> for browser chrome and <code>#fff6dc</code> for the launch background, matching the app's sky and cream theme colors. PNG and web manifest files have explicit response MIME types.</p>
 <p>The feed starts with a functional loading state whose sun matches <code>public/favicon.svg</code>. Its eight rays are grouped into four opposite pairs and animated only through opacity, so each pair appears and disappears together. <code>public/js/app/feed-loading.js</code> retains the initial semantic loader as a template and restores it before public-feed transitions; this clears authenticated cards immediately during logout or session expiry instead of leaving private content visible while <code>/api/feed</code> is pending. Successful public or authenticated rendering replaces the loader directly. <code>prefers-reduced-motion: reduce</code> disables the ray animation and leaves all pairs visible.</p>
+<p>Private and public feeds load 25 entries at a time. The server returns <code>entries</code> plus page metadata containing <code>offset</code>, <code>limit</code>, <code>total</code>, <code>hasPrevious</code>, <code>previousOffset</code>, <code>hasMore</code>, and <code>nextOffset</code>. Previous and next navigation replaces the current page instead of appending to it, so the feed retains at most 25 entry cards and their image data. After the replacement has completed layout, the next animation frame jumps directly to the first card without scroll animation; <code>scroll-margin-top</code> keeps it below the sticky header. Stale requests are invalidated when search, navigation, or a live update changes the active page. Search is evaluated over all matching entry text and private tags on the server, but only image data for the selected page is read. Public search does not inspect private tags. Native <code>loading=&quot;lazy&quot;</code> and <code>decoding=&quot;async&quot;</code> defer image decoding within the active page.</p>
 <h2>Database and migrations</h2>
 <p>The database connection module enables WAL mode and foreign keys at startup, then delegates initialization to the schema module. Schema creation is idempotent. Older databases are upgraded with <code>addColumnIfMissing()</code> calls and a family bootstrap transaction. Feature repositories import the initialized connection and are combined through <code>server/db.js</code>, which keeps the existing persistence API stable for callers.</p>
 <h3><code>users</code></h3>
@@ -179,6 +181,7 @@ npm start</code></pre>
 <p>API objects expose derived <code>content</code> by joining non-empty <code>quote</code> and <code>story</code> values with one blank line. Current clients store the combined editor content in <code>story</code>; the old columns remain readable so earlier records are not lost.</p>
 <p><code>photos_json</code> stores up to six ordered data URLs. <code>photo</code> retains the first item for backward compatibility. Rows created before the collection column was introduced fall back to <code>photo</code> automatically, so existing images are not lost. Current API objects expose both <code>photos</code> and the compatibility <code>photo</code> value.</p>
 <p>Entry photos use allowlisted raster data URLs and each decodes to no more than 512 KiB. Images and avatars are stored inside SQLite, so they contribute directly to database and backup size.</p>
+<p><code>idx_howlers_family_feed</code> and <code>idx_howlers_public_feed</code> support chronological private and public page queries. Export and sitemap generation intentionally use the complete matching collection rather than the paged feed API.</p>
 <p>The editor processes selected photos sequentially and uses an operation generation to discard stale asynchronous results after a reset or replacement. While processing is active, further photo selection, removal, and saving are disabled. <code>saveEntry()</code> also checks the processing state defensively before constructing the request.</p>
 <h2>Authentication and authorization</h2>
 <p>Passwords are hashed with <code>crypto.scrypt</code> and a random per-user salt. Session tokens are 32 random bytes encoded as hexadecimal.</p>
@@ -214,9 +217,9 @@ npm start</code></pre>
 </ul>
 <h3>State and public content</h3>
 <ul>
-<li><code>GET /api/state</code>: full authenticated application state</li>
+<li><code>GET /api/state</code>: authenticated application state with the first private feed page</li>
 <li><code>GET /api/events</code>: guest or authenticated SSE stream</li>
-<li><code>GET /api/feed</code>: public entries without private tags</li>
+<li><code>GET /api/feed?offset=&amp;limit=&amp;q=</code>: one public page without private tags</li>
 <li><code>GET /api/public/howlers/:id</code>: one public entry without private tags</li>
 <li><code>GET /api/shared/:token</code>: one link-shared entry without private tags</li>
 <li><code>GET /posts/:id</code>: server-rendered public entry or <code>404</code> for a private/missing entry</li>
@@ -224,10 +227,11 @@ npm start</code></pre>
 <li><code>GET /sitemap.xml</code>: root page plus up to 50,000 public entry URLs</li>
 <li><code>GET /robots.txt</code>: crawler rules and sitemap address</li>
 </ul>
-<p>Authenticated state contains <code>app</code>, <code>viewer</code>, <code>profile</code>, <code>attention</code>, <code>summary</code>, <code>entries</code>, <code>kids</code>, and <code>publicFeed</code>. Guest SSE state contains <code>app</code> and <code>publicFeed</code>.</p>
+<p>Authenticated state contains <code>app</code>, <code>viewer</code>, <code>profile</code>, <code>attention</code>, <code>summary</code>, the first <code>entries</code> page with <code>entriesPage</code>, <code>kids</code>, and a public fallback page only when the private archive is empty. Guest SSE state contains <code>app</code>, <code>publicFeed</code>, and <code>publicFeedPage</code>.</p>
 <h3>Entries and children</h3>
 <ul>
 <li><code>POST /api/howlers</code>: creates an entry and returns <code>{ ok, entry, state }</code></li>
+<li><code>GET /api/howlers?offset=&amp;limit=&amp;q=</code>: one authenticated archive page</li>
 <li><code>PUT /api/howlers/:id</code>: replaces an entry and returns <code>{ ok, entry, state }</code></li>
 <li><code>DELETE /api/howlers/:id</code>: deletes an entry and returns <code>{ ok, state }</code></li>
 <li><code>POST /api/howlers/:id/share</code>: returns a public path or creates and returns a stable private share path</li>
@@ -288,11 +292,11 @@ npm start</code></pre>
 <h2>Live update model</h2>
 <p>The browser hydrates over HTTP and then opens <code>/api/events</code>.</p>
 <ul>
-<li>authenticated clients receive full family state</li>
-<li>guest clients receive the current public feed</li>
+<li>authenticated clients receive family metadata and one private feed page</li>
+<li>guest clients receive one current public-feed page</li>
 <li>entry mutations publish to all clients because they may affect public content</li>
 <li>profile, child, and invite changes publish to affected family users</li>
-<li>the mutating tab also renders the refreshed state from create, update, and delete responses</li>
+<li>create, update, delete, and live events refresh the active page; if deletion empties the last page, the client moves to the new final page</li>
 <li>invalidated sessions receive <code>{ sessionExpired: true }</code> before the stream closes</li>
 <li>failed streams are removed so they cannot make later mutations fail</li>
 <li>EventSource reconnects after transient network loss</li>
@@ -341,7 +345,7 @@ npm run docs:build
 npm run docs:html-check
 npm run docs:check
 npm run hooks:install</code></pre>
-<p><code>npm test</code> starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, duplicate emails, automatic and manual account locks, forwarded-address throttling, reset-request limits, protected accounts, password reset consumption, write-only SMTP settings, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, single and multiple photos, legacy-photo migration fallback, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and direct-only admin routes.</p>
+<p><code>npm test</code> starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, duplicate emails, automatic and manual account locks, forwarded-address throttling, reset-request limits, protected accounts, password reset consumption, write-only SMTP settings, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, single and multiple photos, legacy-photo migration fallback, default and custom feed pages, archive-wide search beyond the first page, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and direct-only admin routes.</p>
 <p><code>docs/*.md</code> files are the source of truth. <code>npm run docs:build</code> regenerates standalone HTML equivalents, while <code>npm run docs:html-check</code> fails if generated HTML is stale.</p>
 <p><code>npm run docs:check</code> examines staged application changes, including deletions, requires a staged Markdown documentation update when behavior, API, storage, setup, or maintainability changed, and verifies that all generated HTML files match their Markdown sources. A Git inspection error fails the check. <code>DOCS_GUARD_BYPASS=1</code> skips only the relevance check and still checks HTML synchronization.</p>
   </main>

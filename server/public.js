@@ -41,7 +41,7 @@ function renderEntryPhotos(entry, title) {
   if (!photos.length) return '';
   return `<div class="entry-photo-gallery">${photos.map((photo, index) => {
     const position = photos.length > 1 ? ` ${index + 1}/${photos.length}` : '';
-    return `<button class="entry-photo-button" type="button" data-view-photo aria-label="Отвори снимката в пълен размер${position}"><img class="entry-photo" src="${escHtml(photo)}" alt="${escHtml(`Снимка към ${title}`)}${position}"></button>`;
+    return `<button class="entry-photo-button" type="button" data-view-photo aria-label="Отвори снимката в пълен размер${position}"><img class="entry-photo" src="${escHtml(photo)}" alt="${escHtml(`Снимка към ${title}`)}${position}" loading="lazy" decoding="async"></button>`;
   }).join('')}</div>`;
 }
 
