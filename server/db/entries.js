@@ -5,6 +5,14 @@ const { buildMultiChildAgeNote } = require('../entry-ages');
 const { getFamilyIdForUser } = require('./families');
 const { FEED_PAGE_SIZE, MAX_FEED_PAGE_SIZE } = require('../config');
 
+const FEED_COLUMNS = `id, family_id, child_name, child_names_json, title, quote, story, category,
+  happened_on, age_note, mood, tags_json, is_public, is_favorite, created_at, updated_at,
+  CASE
+    WHEN json_valid(photos_json) AND json_array_length(photos_json) > 0 THEN json_array_length(photos_json)
+    WHEN photo IS NOT NULL AND photo != '' THEN 1
+    ELSE 0
+  END AS photo_count`;
+
 function normalizeTags(tags) {
   const list = Array.isArray(tags) ? tags : String(tags || '').split(',');
   return [...new Set(list.map(tag => String(tag).trim()).filter(Boolean))].slice(0, 8);
@@ -46,6 +54,23 @@ function mapEntry(row, familyKids = []) {
   };
 }
 
+function mapFeedEntry(row, familyKids, photoPath) {
+  const entry = mapEntry(row, familyKids);
+  const photoCount = Number(row.photo_count || 0);
+  delete entry.photo;
+  delete entry.photos;
+  delete entry.quote;
+  delete entry.story;
+  return {
+    ...entry,
+    photoCount,
+    photoUrls: Array.from(
+      { length: photoCount },
+      (_value, index) => photoPath(row.id, index, Number(row.updated_at || row.created_at || 0))
+    ),
+  };
+}
+
 function pageOptions(options = {}) {
   const requestedOffset = Number.parseInt(options.offset, 10);
   const offset = Number.isSafeInteger(requestedOffset) && requestedOffset > 0
@@ -68,10 +93,10 @@ function searchableRowText(row, includeTags) {
   ].join(' ').toLocaleLowerCase('bg-BG');
 }
 
-function rowsByIds(ids) {
+function feedRowsByIds(ids) {
   if (!ids.length) return [];
   const placeholders = ids.map(() => '?').join(', ');
-  const byId = new Map(db.prepare(`SELECT * FROM howlers WHERE id IN (${placeholders})`)
+  const byId = new Map(db.prepare(`SELECT ${FEED_COLUMNS} FROM howlers WHERE id IN (${placeholders})`)
     .all(...ids).map(row => [row.id, row]));
   return ids.map(id => byId.get(id)).filter(Boolean);
 }
@@ -98,16 +123,24 @@ function listHowlersPage(userId, options = {}) {
   const { offset, limit, query } = pageOptions(options);
   if (!query) {
     const total = Number(db.prepare('SELECT COUNT(*) AS total FROM howlers WHERE family_id = ?').get(familyId).total);
-    const rows = db.prepare(`SELECT * FROM howlers WHERE family_id = ?
+    const rows = db.prepare(`SELECT ${FEED_COLUMNS} FROM howlers WHERE family_id = ?
       ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`).all(familyId, limit, offset);
-    return pageResult(rows.map(row => mapEntry(row, familyKids)), offset, limit, total);
+    return pageResult(rows.map(row => mapFeedEntry(
+      row,
+      familyKids,
+      (id, index, version) => `/api/howlers/${id}/photos/${index}?v=${version}`
+    )), offset, limit, total);
   }
 
   const matches = db.prepare(`SELECT id, child_name, child_names_json, title, quote, story, age_note, tags_json
     FROM howlers WHERE family_id = ? ORDER BY created_at DESC, id DESC`).all(familyId)
     .filter(row => searchableRowText(row, true).includes(query));
-  const rows = rowsByIds(matches.slice(offset, offset + limit).map(row => row.id));
-  return pageResult(rows.map(row => mapEntry(row, familyKids)), offset, limit, matches.length);
+  const rows = feedRowsByIds(matches.slice(offset, offset + limit).map(row => row.id));
+  return pageResult(rows.map(row => mapFeedEntry(
+    row,
+    familyKids,
+    (id, index, version) => `/api/howlers/${id}/photos/${index}?v=${version}`
+  )), offset, limit, matches.length);
 }
 
 function listPublicHowlersPage(options = {}) {
@@ -116,19 +149,26 @@ function listPublicHowlersPage(options = {}) {
   let rows;
   if (!query) {
     total = Number(db.prepare('SELECT COUNT(*) AS total FROM howlers WHERE is_public = 1').get().total);
-    rows = db.prepare(`SELECT * FROM howlers WHERE is_public = 1
+    rows = db.prepare(`SELECT ${FEED_COLUMNS} FROM howlers WHERE is_public = 1
       ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`).all(limit, offset);
   } else {
     const matches = db.prepare(`SELECT id, child_name, child_names_json, title, quote, story, age_note, tags_json
       FROM howlers WHERE is_public = 1 ORDER BY created_at DESC, id DESC`).all()
       .filter(row => searchableRowText(row, false).includes(query));
     total = matches.length;
-    rows = rowsByIds(matches.slice(offset, offset + limit).map(row => row.id));
+    rows = feedRowsByIds(matches.slice(offset, offset + limit).map(row => row.id));
   }
   const kidsByFamily = new Map();
   const entries = rows.map(row => {
     if (!kidsByFamily.has(row.family_id)) kidsByFamily.set(row.family_id, listFamilyKids(row.family_id));
-    return { ...mapEntry(row, kidsByFamily.get(row.family_id)), tags: [] };
+    return {
+      ...mapFeedEntry(
+        row,
+        kidsByFamily.get(row.family_id),
+        (id, index, version) => `/api/public/howlers/${id}/photos/${index}?v=${version}`
+      ),
+      tags: [],
+    };
   });
   return pageResult(entries, offset, limit, total);
 }
@@ -145,6 +185,22 @@ function getHowler(userId, howlerId) {
   const row = db.prepare('SELECT * FROM howlers WHERE family_id = ? AND id = ?')
     .get(getFamilyIdForUser(userId), howlerId);
   return row ? mapEntry(row, listFamilyKids(row.family_id)) : null;
+}
+
+function photoAt(row, index) {
+  if (!row || !Number.isInteger(index) || index < 0) return null;
+  return photosFromRow(row)[index] || null;
+}
+
+function getHowlerPhoto(userId, howlerId, index) {
+  const row = db.prepare('SELECT photo, photos_json FROM howlers WHERE family_id = ? AND id = ?')
+    .get(getFamilyIdForUser(userId), howlerId);
+  return photoAt(row, index);
+}
+
+function getPublicHowlerPhoto(howlerId, index) {
+  const row = db.prepare('SELECT photo, photos_json FROM howlers WHERE id = ? AND is_public = 1').get(howlerId);
+  return photoAt(row, index);
 }
 
 function createHowler(userId, input) {
@@ -166,7 +222,8 @@ function updateHowler(userId, howlerId, input) {
   const result = db.prepare(`UPDATE howlers SET
     child_name = ?, child_names_json = ?, title = ?, quote = ?, story = ?, photo = ?, photos_json = ?, category = ?,
     happened_on = ?, age_note = ?, mood = ?, tags_json = ?, is_favorite = ?, is_public = ?,
-    updated_at = strftime('%s', 'now') WHERE family_id = ? AND id = ?`).run(
+    updated_at = MAX(CAST(strftime('%s', 'now') AS INTEGER), COALESCE(updated_at, 0) + 1)
+    WHERE family_id = ? AND id = ?`).run(
     input.childNames[0], JSON.stringify(input.childNames), input.title, input.quote, input.story,
     input.photo, JSON.stringify(input.photos), input.category, input.happenedOn, input.ageNote, input.mood,
     JSON.stringify(normalizeTags(input.tags)), input.isFavorite ? 1 : 0, input.isPublic ? 1 : 0,
@@ -260,6 +317,7 @@ function getSummary(userId) {
 }
 
 module.exports = {
-  listHowlers, listHowlersPage, createHowler, updateHowler, deleteHowler, getSummary,
-  listPublicHowlers, listPublicHowlersPage, getPublicHowler, getSharedHowler, getSharePath,
+  listHowlers, listHowlersPage, getHowler, getHowlerPhoto, createHowler, updateHowler, deleteHowler, getSummary,
+  listPublicHowlers, listPublicHowlersPage, getPublicHowler, getPublicHowlerPhoto,
+  getSharedHowler, getSharePath,
 };

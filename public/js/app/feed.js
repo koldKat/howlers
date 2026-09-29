@@ -1,6 +1,13 @@
 import { t } from '../i18n.js';
 import { apiFetch } from './api.js';
-import { categoryClass, categoryLabel, entryMetaLine, renderEntryPhotos, renderInlineContent } from './entry-presentation.js';
+import {
+  activateDeferredPhotos,
+  categoryClass,
+  categoryLabel,
+  entryMetaLine,
+  renderEntryPhotos,
+  renderInlineContent,
+} from './entry-presentation.js';
 import { escapeHtml } from './format.js';
 
 export function createFeedController(els, { feedLoader, onKids, onProfileState, onViewer }) {
@@ -10,6 +17,7 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
   let renderTimer = null;
   let requestSequence = 0;
   let loadingPage = false;
+  let releaseFeedPhotos = () => {};
 
   function formatDateTimeFromUnix(value) {
     return value ? new Date(Number(value) * 1000).toLocaleString('bg-BG') : t('date_na');
@@ -29,7 +37,7 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
     return `${path}?${params}`;
   }
 
-  function entryCard(entry, editable) {
+  function entryCard(entry, editable, eagerPhotos = false) {
     const title = entry.isPublic
       ? `<a class="list-item-title public-entry-link" data-open-post-id="${entry.id}" href="/posts/${entry.id}">${renderInlineContent(entry.title)}</a>`
       : `<div class="list-item-title">${renderInlineContent(entry.title)}</div>`;
@@ -39,7 +47,7 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
         ${entry.category ? `<span class="badge ${escapeHtml(categoryClass(entry.category))}">${escapeHtml(categoryLabel(entry.category))}</span>` : ''}
       </div>
       ${entry.content ? `<div class="entry-content">${renderInlineContent(entry.content)}</div>` : ''}
-      ${renderEntryPhotos(entry)}
+      ${renderEntryPhotos(entry, { eagerFirst: eagerPhotos })}
       ${editable ? `<div class="entry-meta">
         ${entry.isFavorite ? `<span class="tag-chip favorite-chip">${escapeHtml(t('tag_favorite'))}</span>` : ''}
         ${(entry.tags || []).map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join('')}
@@ -80,21 +88,26 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
   function renderPublicFeed(entries = latestFeed, page = publicFeedPage) {
     latestFeed = Array.isArray(entries) ? entries : [];
     publicFeedPage = page || null;
+    releaseFeedPhotos();
     els.feedList.innerHTML = latestFeed.length
-      ? latestFeed.map(entry => entryCard(entry, false)).join('')
+      ? latestFeed.map((entry, index) => entryCard(entry, false, index === 0)).join('')
       : `<div class="empty-state">${escapeHtml(query() ? t('empty_no_filter_match') : t('feed_empty'))}</div>`;
+    releaseFeedPhotos = activateDeferredPhotos(els.feedList);
     renderPagination(publicFeedPage);
   }
 
-  async function loadPublicFeed() {
+  async function loadPublicFeed(preloaded = null) {
     feedLoader.show(t('feed_loading'));
     try {
-      const response = await fetch(pageUrl('/api/feed', 0));
-      if (!response.ok) throw new Error('Feed request failed');
-      const result = await response.json();
+      const result = preloaded || await fetch(pageUrl('/api/feed', 0)).then(response => {
+        if (!response.ok) throw new Error('Feed request failed');
+        return response.json();
+      });
       renderPublicFeed(result.entries || [], result.page);
+      return result;
     } catch {
       renderPublicFeed([], null);
+      return null;
     }
   }
 
@@ -170,9 +183,11 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
       : t(state.summary.total === 1 ? 'archive_kicker_all_one' : 'archive_kicker_all_many', {
           total: state.summary.total,
         });
+    releaseFeedPhotos();
     els.feedList.innerHTML = ownEntries.length
-      ? ownEntries.map(entry => entryCard(entry, true)).join('')
+      ? ownEntries.map((entry, index) => entryCard(entry, true, index === 0)).join('')
       : `<div class="empty-state">${escapeHtml(query() ? t('empty_no_filter_match') : t('feed_empty'))}</div>`;
+    releaseFeedPhotos = activateDeferredPhotos(els.feedList);
     renderPagination(page);
   }
 
@@ -249,6 +264,8 @@ export function createFeedController(els, { feedLoader, onKids, onProfileState, 
       latestState = null;
       latestFeed = [];
       publicFeedPage = null;
+      releaseFeedPhotos();
+      releaseFeedPhotos = () => {};
       els.searchInput.value = '';
       requestSequence += 1;
       renderPagination(null);

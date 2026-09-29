@@ -14,7 +14,6 @@ function appInfo() {
 function buildState(userId) {
   const viewer = db.getViewer(userId);
   if (!viewer) return null;
-  const profile = db.getProfile(userId);
   const summary = db.getSummary(userId);
   const entriesPage = db.listHowlersPage(userId);
   const publicPage = summary.total ? { entries: [], page: null } : db.listPublicHowlersPage();
@@ -22,9 +21,8 @@ function buildState(userId) {
     app: appInfo(),
     viewer: {
       ...viewer,
-      avatar: profile ? profile.avatar : viewer.avatar,
     },
-    profile,
+    profile: viewer,
     attention: db.getInviteAttention(userId),
     summary,
     entries: entriesPage.entries,

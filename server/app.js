@@ -1,6 +1,6 @@
 const db = require('./db');
 const { PORT } = require('./config');
-const { send } = require('./http');
+const { send, sendImageDataUrl } = require('./http');
 const { handlePublicPost, handleRobots, handleSharedPost, handleSitemap } = require('./public');
 const { serveFile } = require('./static');
 const { createAdminHandlers } = require('./routes/admin');
@@ -21,8 +21,10 @@ function createRequestHandler({ sseHub }) {
       return await (async () => {
       const url = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);
       const howler = url.pathname.match(/^\/api\/howlers\/(\d+)$/);
+      const howlerPhoto = url.pathname.match(/^\/api\/howlers\/(\d+)\/photos\/(\d+)$/);
       const howlerShare = url.pathname.match(/^\/api\/howlers\/(\d+)\/share$/);
       const publicHowler = url.pathname.match(/^\/api\/public\/howlers\/(\d+)$/);
+      const publicHowlerPhoto = url.pathname.match(/^\/api\/public\/howlers\/(\d+)\/photos\/(\d+)$/);
       const sharedHowler = url.pathname.match(/^\/api\/shared\/([A-Za-z0-9_-]{32})$/);
       const kid = url.pathname.match(/^\/api\/kids\/(\d+)$/);
       const publicPost = url.pathname.match(/^\/posts\/(\d+)$/);
@@ -70,7 +72,11 @@ function createRequestHandler({ sseHub }) {
 
       if (req.method === 'GET' && url.pathname === '/api/howlers') return entries.list(req, res, url);
       if (req.method === 'POST' && url.pathname === '/api/howlers') return entries.create(req, res);
+      if (howlerPhoto && req.method === 'GET') {
+        return entries.photo(req, res, Number(howlerPhoto[1]), Number(howlerPhoto[2]));
+      }
       if (howlerShare && req.method === 'POST') return entries.share(req, res, Number(howlerShare[1]));
+      if (howler && req.method === 'GET') return entries.get(req, res, Number(howler[1]));
       if (howler && req.method === 'PUT') return entries.update(req, res, Number(howler[1]));
       if (howler && req.method === 'DELETE') return entries.remove(req, res, Number(howler[1]));
       if (req.method === 'GET' && url.pathname === '/api/feed') {
@@ -83,6 +89,13 @@ function createRequestHandler({ sseHub }) {
       if (publicHowler && req.method === 'GET') {
         const entry = db.getPublicHowler(Number(publicHowler[1]));
         return entry ? send(res, 200, entry) : send(res, 404, { error: 'Записът не е намерен.' });
+      }
+      if (publicHowlerPhoto && req.method === 'GET') {
+        const photo = db.getPublicHowlerPhoto(Number(publicHowlerPhoto[1]), Number(publicHowlerPhoto[2]));
+        if (!photo || !sendImageDataUrl(res, photo, 'public, max-age=31536000, immutable')) {
+          return send(res, 404, { error: 'Снимката не е намерена.' });
+        }
+        return;
       }
       if (sharedHowler && req.method === 'GET') {
         const entry = db.getSharedHowler(sharedHowler[1]);

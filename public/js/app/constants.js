@@ -1,7 +1,7 @@
 const domain = globalThis.HowlersDomain;
 if (!domain) throw new Error('Shared app domain was not loaded.');
 
-export const TOKEN_KEY = 'howlers_webapp_token';
+export const TOKEN_KEY = domain.storage.tokenKey;
 export const COPYRIGHT_START_YEAR = 2026;
 
 export const APP_NAME = domain.brand.name;

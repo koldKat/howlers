@@ -99,6 +99,7 @@ Browser code:
 - `public/js/app/kids.js`: child-list rendering and child create/delete actions
 - `public/js/app/profile.js`: profile modal, non-editable initial dialog focus, avatars, passwords, exports, and family invitations
 - `public/js/i18n.js`: locale loading and DOM translation
+- `public/js/startup.js`: early parallel locale and authenticated/public state requests during HTML parsing
 - `public/locales/bg.json`: Bulgarian strings
 - `public/admin.html`, `public/js/admin.js`, `public/js/admin/*`, `public/css/admin.css`: admin panel
 
@@ -131,7 +132,9 @@ The install manifest exposes the SVG favicon with `purpose: any` and opaque 192 
 
 The feed starts with a functional loading state whose sun matches `public/favicon.svg`. Its eight rays are grouped into four opposite pairs and animated only through opacity, so each pair appears and disappears together. `public/js/app/feed-loading.js` retains the initial semantic loader as a template and restores it before public-feed transitions; this clears authenticated cards immediately during logout or session expiry instead of leaving private content visible while `/api/feed` is pending. Successful public or authenticated rendering replaces the loader directly. `prefers-reduced-motion: reduce` disables the ray animation and leaves all pairs visible.
 
-Private and public feeds load 25 entries at a time. The server returns `entries` plus page metadata containing `offset`, `limit`, `total`, `hasPrevious`, `previousOffset`, `hasMore`, and `nextOffset`. Previous and next navigation replaces the current page instead of appending to it, so the feed retains at most 25 entry cards and their image data. After the replacement has completed layout, the next animation frame jumps directly to the first card without scroll animation; `scroll-margin-top` keeps it below the sticky header. Stale requests are invalidated when search, navigation, or a live update changes the active page. Search is evaluated over all matching entry text and private tags on the server, but only image data for the selected page is read. Public search does not inspect private tags. Native `loading="lazy"` and `decoding="async"` defer image decoding within the active page.
+`domain.js`, `startup.js`, and the module entry point are discovered in the document head. The classic startup module reads the shared token key and begins the Bulgarian locale request plus either `/api/state` or `/api/feed` while the remainder of the HTML is still parsing. Rejections are captured to avoid premature unhandled-promise events. `initI18n()` and the main boot flow consume these promises, with their normal request paths retained as fallbacks. This avoids a late serial locale-then-state waterfall and duplicate startup requests.
+
+Private and public feeds load 25 entries at a time. The server returns `entries` plus page metadata containing `offset`, `limit`, `total`, `hasPrevious`, `previousOffset`, `hasMore`, and `nextOffset`. Previous and next navigation replaces the current page instead of appending to it, so the feed retains at most 25 entry cards. Feed entries contain `photoCount` and versioned `photoUrls`, not base64 image bodies or duplicate legacy text fields. The first feed photo starts immediately with high fetch priority, while an `IntersectionObserver` starts other photos at low priority when they are within 120 px of the viewport. Private requests include the bearer token. Themed placeholders reserve image space until decoding finishes, and object URLs are revoked whenever the page is replaced. Entry update timestamps advance monotonically, including multiple edits in one second, so an edited photo always receives a new immutable URL. Versioned public photos use immutable public caching; authenticated photos use immutable private caching with `Vary: Authorization`, so repeat loads avoid transfers without sharing private responses across credentials. Opening the editor fetches the single complete entry, including its photos. After replacement has completed layout, the next animation frame jumps directly to the first card without scroll animation; `scroll-margin-top` keeps it below the sticky header. Stale requests are invalidated when search, navigation, or a live update changes the active page. Search is evaluated over all matching entry text and private tags on the server without returning image bodies. Public search does not inspect private tags.
 
 ## Database and migrations
 
@@ -197,7 +200,7 @@ When editing, the child picker compares the existing age note with its current c
 
 API objects expose derived `content` by joining non-empty `quote` and `story` values with one blank line. Current clients store the combined editor content in `story`; the old columns remain readable so earlier records are not lost.
 
-`photos_json` stores up to six ordered data URLs. `photo` retains the first item for backward compatibility. Rows created before the collection column was introduced fall back to `photo` automatically, so existing images are not lost. Current API objects expose both `photos` and the compatibility `photo` value.
+`photos_json` stores up to six ordered data URLs. `photo` retains the first item for backward compatibility. Rows created before the collection column was introduced fall back to `photo` automatically, so existing images are not lost. Complete entry objects expose both `photos` and the compatibility `photo` value. Paged feed objects omit both fields and expose lightweight photo URLs instead.
 
 Entry photos use allowlisted raster data URLs and each decodes to no more than 512 KiB. Images and avatars are stored inside SQLite, so they contribute directly to database and backup size.
 
@@ -251,18 +254,21 @@ Tokens are stored in browser `localStorage`. Deployments should use HTTPS when a
 - `GET /api/events`: guest or authenticated SSE stream
 - `GET /api/feed?offset=&limit=&q=`: one public page without private tags
 - `GET /api/public/howlers/:id`: one public entry without private tags
+- `GET /api/public/howlers/:id/photos/:index`: one public photo with versioned immutable browser caching
 - `GET /api/shared/:token`: one link-shared entry without private tags
 - `GET /posts/:id`: server-rendered public entry or `404` for a private/missing entry
 - `GET /shared/:token`: server-rendered link-shared entry with `noindex` metadata
 - `GET /sitemap.xml`: root page plus up to 50,000 public entry URLs
 - `GET /robots.txt`: crawler rules and sitemap address
 
-Authenticated state contains `app`, `viewer`, `profile`, `attention`, `summary`, the first `entries` page with `entriesPage`, `kids`, and a public fallback page only when the private archive is empty. Guest SSE state contains `app`, `publicFeed`, and `publicFeedPage`.
+Authenticated state contains `app`, `viewer`, a lightweight `profile` identity, `attention`, `summary`, the first `entries` page with `entriesPage`, `kids`, and a public fallback page only when the private archive is empty. Full family members and invitation lists are loaded from `/api/profile` only when the profile dialog opens. Logged-in startup requests `/api/state` directly instead of serially requesting `/api/me` first. Guest SSE state contains `app`, `publicFeed`, and `publicFeedPage`.
 
 ### Entries and children
 
 - `POST /api/howlers`: creates an entry and returns `{ ok, entry, state }`
 - `GET /api/howlers?offset=&limit=&q=`: one authenticated archive page
+- `GET /api/howlers/:id`: one complete authenticated entry for editing
+- `GET /api/howlers/:id/photos/:index`: one authenticated private or public entry photo
 - `PUT /api/howlers/:id`: replaces an entry and returns `{ ok, entry, state }`
 - `DELETE /api/howlers/:id`: deletes an entry and returns `{ ok, state }`
 - `POST /api/howlers/:id/share`: returns a public path or creates and returns a stable private share path
@@ -340,6 +346,7 @@ The browser hydrates over HTTP and then opens `/api/events`.
 - entry mutations publish to all clients because they may affect public content
 - profile, child, and invite changes publish to affected family users
 - create, update, delete, and live events refresh the active page; if deletion empties the last page, the client moves to the new final page
+- the first SSE snapshot is compared with the HTTP startup snapshot and ignored only when identical, preventing a duplicate initial feed render and duplicate first-photo request without losing a change that occurred between the two connections
 - invalidated sessions receive `{ sessionExpired: true }` before the stream closes
 - failed streams are removed so they cannot make later mutations fail
 - EventSource reconnects after transient network loss
@@ -393,6 +400,7 @@ The CSS uses three responsive ranges:
 - up to 860 px: the layout becomes one column
 - up to 600 px: controls stack and editor/profile dialogs use the full visible mobile viewport
 - up to 860 px: family summary and child management move into a full-screen settings sheet opened from an SVG cog in the app header; its sticky close row and `z-index: 120` keep it above the `z-index: 100` navigation bar
+- the narrow-screen child form applies full width only to its direct submit button; the nested date-picker trigger retains its fixed input-sized dimensions, and its SVG is explicitly constrained to the button box
 - up to 400 px: compact actions stack where necessary
 
 The background illustration is fixed to the viewport. Its doodles are aligned with the sky, sand, and grass color bands.
@@ -415,7 +423,7 @@ npm run docs:check
 npm run hooks:install
 ```
 
-`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, duplicate emails, automatic and manual account locks, forwarded-address throttling, reset-request limits, protected accounts, password reset consumption, write-only SMTP settings, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, single and multiple photos, legacy-photo migration fallback, default and custom feed pages, archive-wide search beyond the first page, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and direct-only admin routes.
+`npm test` starts the server on a temporary port with a temporary SQLite database and backups disabled. It covers malformed and oversized requests, duplicate emails, automatic and manual account locks, forwarded-address throttling, reset-request limits, protected accounts, password reset consumption, write-only SMTP settings, profiles, passwords, avatars, invites, family merge, children and calendar dates, single-child and multi-child entries, formatting tokens, single and multiple photos, authenticated and public lazy-photo routes, legacy-photo migration fallback, lightweight feed payloads, default and custom feed pages, archive-wide search beyond the first page, public and private-link sharing, sitemap exclusion, public feed, SEO routes, export, logout, and direct-only admin routes.
 
 `docs/*.md` files are the source of truth. `npm run docs:build` regenerates standalone HTML equivalents, while `npm run docs:html-check` fails if generated HTML is stale.
 

@@ -583,6 +583,14 @@ select {
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid rgba(68, 102, 164, 0.12);
 }
+.entry-photo-button.is-loading {
+  min-height: 180px;
+  border: 1px solid rgba(68, 102, 164, 0.12);
+  background:
+    linear-gradient(135deg, rgba(159, 226, 255, 0.42), rgba(255, 232, 157, 0.38) 52%, rgba(158, 225, 124, 0.32));
+  cursor: default;
+}
+.entry-photo.is-loading { min-height: 180px; opacity: 0; }
 .entry-photo-gallery {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -672,7 +680,7 @@ body:has(.post-detail-dialog[data-server-rendered][open]) { overflow: hidden; }
   color: #9a5b05;
 }
 .date-picker-trigger:hover { background: rgba(255, 171, 53, 0.25); }
-.date-picker-trigger svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.date-picker-trigger svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .date-picker-dialog {
   width: min(350px, calc(100vw - 24px));
   margin: auto;
@@ -1467,7 +1475,7 @@ body.editor-open, body.profile-open { overflow: hidden; }
     text-align: center;
   }
   .kid-add-form .date-input-control,
-  .kid-add-form button {
+  .kid-add-form > button {
     width: 100%;
   }
   .avatar-upload-hint::after {

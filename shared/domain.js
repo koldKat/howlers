@@ -12,6 +12,7 @@
     subtitle: 'Реплики, случки и малки легенди',
   }),
   assets: Object.freeze({ emoticons: '/emoticons.svg' }),
+  storage: Object.freeze({ tokenKey: 'howlers_webapp_token' }),
   limits: Object.freeze({
     maxAvatarBytes: 300 * 1024,
     maxPostPhotoBytes: 512 * 1024,

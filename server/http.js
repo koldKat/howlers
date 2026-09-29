@@ -7,6 +7,22 @@ function send(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+function sendImageDataUrl(res, dataUrl, cacheControl = 'private, no-store', extraHeaders = {}) {
+  const match = String(dataUrl || '').match(/^data:image\/(jpeg|png|webp|gif);base64,([A-Za-z0-9+/]+={0,2})$/);
+  if (!match) return false;
+  const type = match[1] === 'jpeg' ? 'jpeg' : match[1];
+  const body = Buffer.from(match[2], 'base64');
+  res.writeHead(200, {
+    'Content-Type': `image/${type}`,
+    'Content-Length': body.length,
+    'Cache-Control': cacheControl,
+    'X-Content-Type-Options': 'nosniff',
+    ...extraHeaders,
+  });
+  res.end(body);
+  return true;
+}
+
 function readBody(req, maxBytes = MAX_REQUEST_BYTES) {
   return new Promise((resolve, reject) => {
     let raw = '';
@@ -62,6 +78,7 @@ function isLocalhost(req) {
 
 module.exports = {
   send,
+  sendImageDataUrl,
   readBody,
   tokenFromReq,
   isLocalhost,

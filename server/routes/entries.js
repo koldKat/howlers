@@ -1,7 +1,7 @@
 const db = require('../db');
 const { authenticate } = require('../auth');
 const { localDateString } = require('../date-validation');
-const { readBody, send } = require('../http');
+const { readBody, send, sendImageDataUrl } = require('../http');
 const { validateHowler } = require('../howler-validation');
 const { buildState } = require('../state');
 
@@ -15,6 +15,27 @@ function createEntryHandlers({ sseHub }) {
       query: url.searchParams.get('q'),
     });
     send(res, 200, result);
+  }
+
+  async function get(req, res, id) {
+    const session = await authenticate(req, res);
+    if (!session) return;
+    const entry = db.getHowler(session.user_id, id);
+    send(res, entry ? 200 : 404, entry || { error: 'Записът не е намерен.' });
+  }
+
+  async function photo(req, res, id, index) {
+    const session = await authenticate(req, res);
+    if (!session) return;
+    const dataUrl = db.getHowlerPhoto(session.user_id, id, index);
+    if (!dataUrl || !sendImageDataUrl(
+      res,
+      dataUrl,
+      'private, max-age=31536000, immutable',
+      { Vary: 'Authorization' }
+    )) {
+      send(res, 404, { error: 'Снимката не е намерена.' });
+    }
   }
 
   async function create(req, res) {
@@ -73,7 +94,7 @@ function createEntryHandlers({ sseHub }) {
     send(res, 200, { path });
   }
 
-  return { list, create, update, remove, share };
+  return { list, get, photo, create, update, remove, share };
 }
 
 module.exports = { createEntryHandlers };

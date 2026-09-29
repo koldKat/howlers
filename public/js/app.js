@@ -254,13 +254,26 @@ function closeEvents() {
   eventSource = null;
 }
 
-function openEvents() {
+function eventSnapshotKey(payload) {
+  if (!payload) return '';
+  if (payload.publicFeed) return JSON.stringify([payload.publicFeed, payload.publicFeedPage]);
+  if (payload.entries && payload.page) return JSON.stringify([payload.entries, payload.page]);
+  return JSON.stringify(payload);
+}
+
+function openEvents(initialSnapshot = null) {
   closeEvents();
+  let initialSnapshotKey = eventSnapshotKey(initialSnapshot);
   const token = getToken();
   const url = token ? `/api/events?token=${encodeURIComponent(token)}` : '/api/events';
   eventSource = new EventSource(url);
   eventSource.onmessage = event => {
     const payload = JSON.parse(event.data);
+    if (initialSnapshotKey) {
+      const isDuplicate = eventSnapshotKey(payload) === initialSnapshotKey;
+      initialSnapshotKey = '';
+      if (isDuplicate) return;
+    }
     if (payload.sessionExpired) {
       handleSessionExpired();
       return;
@@ -293,14 +306,23 @@ function closeConfirm(result) {
 
 // ── Auth flow ─────────────────────────────────────────────────
 
+async function takeStartupData(authenticated) {
+  const startup = globalThis.HowlersStartup;
+  if (!startup || startup.consumed || startup.authenticated !== authenticated) return null;
+  startup.consumed = true;
+  const result = await startup.dataPromise;
+  if (!result.ok) throw result.error;
+  return result.data;
+}
+
 async function hydrateApp() {
-  const me = await apiFetch('/api/me');
-  viewer = { username: me.username, displayName: me.displayName || null };
-  profileController.setInitialProfile(me);
+  const state = await takeStartupData(true) || await apiFetch('/api/state');
+  viewer = { username: state.viewer.username, displayName: state.viewer.displayName || null };
+  profileController.setInitialProfile(state.profile || state.viewer);
   setAuthState(true);
   authController.close();
-  feedController.render(await apiFetch('/api/state'));
-  openEvents();
+  feedController.render(state);
+  openEvents(state);
 }
 
 async function logout() {
@@ -333,8 +355,8 @@ async function becomeGuest() {
   setAuthState(false);
   setMobileFamilySettingsOpen(false);
   authController.close();
-  await feedController.loadPublicFeed();
-  openEvents();
+  const feed = await feedController.loadPublicFeed(await takeStartupData(false));
+  openEvents(feed);
 }
 
 // ── CRUD ─────────────────────────────────────────────────────
@@ -392,14 +414,14 @@ async function boot() {
   if (resettingPassword) {
     clearToken();
     setAuthState(false);
-    await feedController.loadPublicFeed();
-    openEvents();
+    const feed = await feedController.loadPublicFeed(await takeStartupData(false));
+    openEvents(feed);
     return;
   }
   if (!getToken()) {
     setAuthState(false);
-    await feedController.loadPublicFeed();
-    openEvents();
+    const feed = await feedController.loadPublicFeed(await takeStartupData(false));
+    openEvents(feed);
     return;
   }
   try {
@@ -407,8 +429,8 @@ async function boot() {
   } catch {
     clearToken();
     setAuthState(false);
-    await feedController.loadPublicFeed();
-    openEvents();
+    const feed = await feedController.loadPublicFeed(await takeStartupData(false));
+    openEvents(feed);
   }
 }
 
@@ -432,7 +454,7 @@ els.searchInput.addEventListener('input', () => feedController.scheduleRender())
 els.feedPagePrevious.addEventListener('click', feedController.previousPage);
 els.feedPageNext.addEventListener('click', feedController.nextPage);
 
-els.feedList.addEventListener('click', event => {
+els.feedList.addEventListener('click', async event => {
   const openLink = event.target.closest('[data-open-post-id]');
   if (openLink && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
     event.preventDefault();
@@ -445,8 +467,16 @@ els.feedList.addEventListener('click', event => {
     return;
   }
   const editButton = event.target.closest('[data-edit-id]');
-  const entry = editButton ? feedController.findEntry(editButton.dataset.editId) : null;
-  if (entry) fillForm(entry);
+  if (editButton) {
+    editButton.disabled = true;
+    try {
+      fillForm(await apiFetch(`/api/howlers/${editButton.dataset.editId}`));
+    } catch {
+      // A concurrent deletion is reflected by the next state event.
+    } finally {
+      editButton.disabled = false;
+    }
+  }
 });
 
 els.confirmCancel.addEventListener('click', () => closeConfirm(false));

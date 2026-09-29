@@ -47,7 +47,9 @@ async function waitForServer() {
   throw new Error(`Server did not start:\n${serverOutput}`);
 }
 
-async function request(pathname, { token, method = 'GET', body, bodyText, raw = false, headers: extraHeaders = {} } = {}) {
+async function request(pathname, {
+  token, method = 'GET', body, bodyText, raw = false, binary = false, headers: extraHeaders = {},
+} = {}) {
   const headers = { ...extraHeaders };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined || bodyText !== undefined) headers['Content-Type'] = 'application/json';
@@ -59,7 +61,7 @@ async function request(pathname, { token, method = 'GET', body, bodyText, raw = 
   return {
     status: response.status,
     headers: response.headers,
-    body: raw ? await response.text() : await response.json(),
+    body: binary ? Buffer.from(await response.arrayBuffer()) : raw ? await response.text() : await response.json(),
   };
 }
 
@@ -119,6 +121,7 @@ async function main() {
   assert.match(result.body, /<meta name="description" content="Детски бисери, смешни детски реплики/);
   assert.match(result.body, /"@type":"WebSite"/);
   assert.match(result.body, /<script src="\/js\/domain\.js"><\/script>/);
+  assert.match(result.body, /<head>[\s\S]*<script src="\/js\/startup\.js"><\/script>[\s\S]*<script type="module" src="\/js\/app\.js"><\/script>[\s\S]*<\/head>/);
   assert.match(result.body, /id="happened-on" data-date-picker[^>]*placeholder="дд\/мм\/гггг"/);
   assert.match(result.body, /id="kid-dob-input" data-date-picker[^>]*placeholder="дд\/мм\/гггг"/);
   assert.match(result.body, /id="date-picker-dialog"/);
@@ -168,7 +171,24 @@ async function main() {
   assert.match(result.body, /profileController\.isOpen\(\)/);
   assert.match(result.body, /await postDetailController\.openInitialRoute\(\);\s+editorTools\.initializeControls\(\)/);
   assert.match(result.body, /els\.editorDialog\.scrollTop = 0/);
+  assert.match(result.body, /async function hydrateApp\(\)\s*\{\s*const state = await takeStartupData\(true\) \|\| await apiFetch\('\/api\/state'\)/);
+  assert.match(result.body, /function eventSnapshotKey\(payload\)/);
+  assert.match(result.body, /const isDuplicate = eventSnapshotKey\(payload\) === initialSnapshotKey/);
+  assert.match(result.body, /if \(isDuplicate\) return/);
+  assert.match(result.body, /openEvents\(state\)/);
+  assert.match(result.body, /els\.feedList\.addEventListener\('click', async event =>/);
+  assert.match(result.body, /fillForm\(await apiFetch\(`\/api\/howlers\/\$\{editButton\.dataset\.editId\}`\)\)/);
   assert.doesNotMatch(result.body, /latestKids/);
+
+  result = await request('/js/startup.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /localePromise: capture\(jsonRequest\('\/locales\/bg\.json'\)\)/);
+  assert.match(result.body, /jsonRequest\('\/api\/state'/);
+  assert.match(result.body, /jsonRequest\('\/api\/feed\?offset=0'\)/);
+
+  result = await request('/js/i18n.js', { raw: true });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /HowlersStartup\?\.localePromise/);
 
   result = await request('/', { raw: true });
   assert.equal(result.status, 200);
@@ -205,6 +225,9 @@ async function main() {
   assert.match(result.body, /#mobile-family-settings,\s*\.mobile-sidebar-head\s*\{ display: none; \}/);
   assert.match(result.body, /@media \(max-width: 860px\)[\s\S]*#mobile-family-settings\s*\{ display: inline-flex; \}/);
   assert.match(result.body, /\.site-nav\s*\{[\s\S]*background:[\s\S]*#9fe2ff/);
+  assert.match(result.body, /\.kid-add-form\s*>\s*button\s*\{\s*width:\s*100%/);
+  assert.doesNotMatch(result.body, /\.kid-add-form button\s*\{\s*width:\s*100%/);
+  assert.match(result.body, /\.date-picker-trigger svg\s*\{[^}]*width:\s*100%;[^}]*height:\s*100%/);
 
   result = await request('/js/app/feed.js', { raw: true });
   assert.equal(result.status, 200);
@@ -221,6 +244,11 @@ async function main() {
   result = await request('/js/app/entry-presentation.js', { raw: true });
   assert.equal(result.status, 200);
   assert.match(result.body, /loading="lazy" decoding="async"/);
+  assert.match(result.body, /export function activateDeferredPhotos/);
+  assert.match(result.body, /IntersectionObserver/);
+  assert.match(result.body, /Authorization: `Bearer \$\{token\}`/);
+  assert.match(result.body, /priority: image\.dataset\.photoPriority === 'high' \? 'high' : 'low'/);
+  assert.match(result.body, /load\(firstImage\);\s+loadRemaining\(\)/);
 
   result = await request('/js/app/post-detail.js', { raw: true });
   assert.equal(result.status, 200);
@@ -556,6 +584,21 @@ async function main() {
   assert.deepEqual(result.body.entry.photos, [TINY_PNG, TINY_PNG]);
   assert.equal(result.body.entry.happenedOn, '2018-03-14');
   assert.equal(result.body.state.entries[0].id, backdatedPhotoId);
+  const initialBackdatedPhotoUrl = result.body.state.entries[0].photoUrls[0];
+  result = await request(`/api/howlers/${backdatedPhotoId}`, {
+    token: alpha,
+    method: 'PUT',
+    body: entryBody({
+      title: 'Updated photo entry',
+      quote: '',
+      story: '',
+      photos: [TINY_PNG, TINY_PNG],
+      happenedOn: '2018-03-14',
+      isPublic: true,
+    }),
+  });
+  assert.equal(result.status, 200);
+  assert.notEqual(result.body.state.entries[0].photoUrls[0], initialBackdatedPhotoUrl);
   result = await request('/api/feed');
   assert.equal(result.body.entries[0].id, backdatedPhotoId);
   assert.equal(result.body.page.offset, 0);
@@ -597,7 +640,17 @@ async function main() {
   legacyPhotoDb.prepare("UPDATE howlers SET photos_json = '[]' WHERE id = ?").run(alphaEntryId);
   legacyPhotoDb.close();
   result = await request('/api/state', { token: alpha });
-  assert.deepEqual(result.body.entries.find(entry => entry.id === alphaEntryId).photos, [TINY_PNG]);
+  const legacyPhotoEntry = result.body.entries.find(entry => entry.id === alphaEntryId);
+  assert.equal(legacyPhotoEntry.photoCount, 1);
+  assert.match(legacyPhotoEntry.photoUrls[0], new RegExp(`^/api/howlers/${alphaEntryId}/photos/0\\?v=\\d+$`));
+  assert.equal(Object.prototype.hasOwnProperty.call(legacyPhotoEntry, 'photos'), false);
+  assert.equal((await request(`/api/howlers/${alphaEntryId}/photos/0`)).status, 401);
+  result = await request(`/api/howlers/${alphaEntryId}/photos/0`, { token: alpha, binary: true });
+  assert.equal(result.status, 200);
+  assert.equal(result.headers.get('content-type'), 'image/png');
+  assert.equal(result.headers.get('cache-control'), 'private, max-age=31536000, immutable');
+  assert.equal(result.headers.get('vary'), 'Authorization');
+  assert.deepEqual(result.body, Buffer.from(TINY_PNG.split(',')[1], 'base64'));
 
   result = await request('/api/howlers', {
     token: alpha,
@@ -740,7 +793,8 @@ async function main() {
     [alphaEntryId, betaEntryId].sort()
   );
   assert.equal(alphaState.body.kids.some(kid => kid.id === betaKidId), true);
-  assert.equal(betaState.body.profile.familyMembers.length, 2);
+  assert.equal(Object.prototype.hasOwnProperty.call(betaState.body.profile, 'familyMembers'), false);
+  assert.equal((await request('/api/profile', { token: beta })).body.familyMembers.length, 2);
   assert.equal(alphaState.body.viewer.id, alphaState.body.profile.id);
   assert.equal(alphaState.body.viewer.locale, 'bg');
   assert.ok(Number.isInteger(alphaState.body.viewer.familyId));
@@ -786,8 +840,8 @@ async function main() {
   assert.equal(result.body.entry.story, 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]');
   assert.equal(result.body.entry.content, 'Shared [u]:surprised:[/u]\n\nA [i]silly ending :silly:[/i] then [s]angry :angry:[/s]');
   assert.equal(result.body.entry.photo, TINY_PNG);
-  assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photo, TINY_PNG);
-  assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photos.length, 2);
+  assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photoCount, 2);
+  assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photoUrls.length, 2);
   assert.deepEqual(result.body.state.entries.find(entry => entry.id === alphaEntryId).childNames, ['Mila', 'Niki']);
   assert.deepEqual(result.body.state.summary.kidsBreakdown, [
     { childName: 'Niki', total: 2 },
@@ -798,14 +852,28 @@ async function main() {
   assert.equal(result.body.entries.some(entry => entry.id === alphaEntryId), true);
   assert.equal(result.body.entries.find(entry => entry.id === alphaEntryId).title, 'Edited [b]:laugh: by beta[/b]');
   assert.match(result.body.entries.find(entry => entry.id === alphaEntryId).content, /Shared \[u\]:surprised:/);
-  assert.equal(result.body.entries.find(entry => entry.id === alphaEntryId).photo, TINY_PNG);
-  assert.equal(result.body.entries.find(entry => entry.id === alphaEntryId).photos.length, 2);
+  assert.equal(result.body.entries.find(entry => entry.id === alphaEntryId).photoCount, 2);
+  assert.deepEqual(
+    result.body.entries.find(entry => entry.id === alphaEntryId).photoUrls.map(url => url.replace(/\?v=\d+$/, '')),
+    [`/api/public/howlers/${alphaEntryId}/photos/0`, `/api/public/howlers/${alphaEntryId}/photos/1`]
+  );
   assert.deepEqual(result.body.entries.find(entry => entry.id === alphaEntryId).childNames, ['Mila', 'Niki']);
   assert.deepEqual(result.body.entries.find(entry => entry.id === alphaEntryId).tags, []);
   assert.equal(result.body.entries.some(entry => entry.id === betaEntryId), false);
 
+  result = await request(`/api/public/howlers/${alphaEntryId}/photos/1`, { binary: true });
+  assert.equal(result.status, 200);
+  assert.equal(result.headers.get('content-type'), 'image/png');
+  assert.equal(result.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  assert.deepEqual(result.body, Buffer.from(TINY_PNG.split(',')[1], 'base64'));
+
+  result = await request(`/api/howlers/${alphaEntryId}`, { token: alpha });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.photos, [TINY_PNG, TINY_PNG]);
+
   result = await request('/api/state', { token: alpha });
   assert.deepEqual(result.body.entries.find(entry => entry.id === alphaEntryId).tags, ['shared']);
+  assert.equal(JSON.stringify(result.body.entries).includes('data:image/'), false);
   assert.ok(result.body.entries.length <= domain.limits.feedPageSize);
   assert.equal(result.body.entriesPage.offset, 0);
   assert.equal(Object.prototype.hasOwnProperty.call(result.body.summary, 'recent'), false);
@@ -1028,7 +1096,8 @@ async function main() {
   assert.equal(result.status, 200);
   assert.equal(result.body.entry.photo, '');
   assert.deepEqual(result.body.entry.photos, []);
-  assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photo, '');
+  assert.equal(result.body.state.entries.find(entry => entry.id === alphaEntryId).photoCount, 0);
+  assert.deepEqual(result.body.state.entries.find(entry => entry.id === alphaEntryId).photoUrls, []);
 
   result = await request('/api/admin/stats');
   assert.equal(result.status, 200);

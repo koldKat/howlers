@@ -12,7 +12,9 @@ async function loadStrings(lang) {
 
 export async function initI18n(preferredLocale) {
   locale = SUPPORTED.includes(preferredLocale) ? preferredLocale : DEFAULT;
-  strings = await loadStrings(locale);
+  const startupLocale = locale === DEFAULT ? globalThis.HowlersStartup?.localePromise : null;
+  const preloaded = startupLocale ? await startupLocale : null;
+  strings = preloaded?.ok ? preloaded.data : await loadStrings(locale);
   applyI18n();
 }
 
